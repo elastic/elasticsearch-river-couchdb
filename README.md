@@ -103,3 +103,20 @@ To use HTTPS, pass the **protocol** field. Most likely, you will also have to ch
 	        "no_verify" : "true"
 	    }
 	}
+
+
+Ignoring Attachments
+====================
+
+You can ignore attachments as provided by couchDb for each document (`_attachments` field).
+
+Here is an example setting that disable *attachments* for all docs:
+
+	{
+	  "type":"couchdb",
+	  "couchdb": {
+	    "ignore_attachments":true
+	  }
+	}
+
+Note, by default, attachments are not ignored (**false**)
