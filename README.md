@@ -3,14 +3,16 @@ CouchDB River Plugin for ElasticSearch
 
 The CouchDB River plugin allows to hook into couchdb `_changes` feed and automatically index it into elasticsearch.
 
-In order to install the plugin, simply run: `bin/plugin -install elasticsearch/elasticsearch-river-couchdb/1.0.0`.
+In order to install the plugin, simply run: `bin/plugin -install elasticsearch/elasticsearch-river-couchdb/1.1.0`.
 
     -------------------------------------
     | CouchDB Plugin | ElasticSearch    |
     -------------------------------------
-    | master         | 0.18 -> master   |
+    | master         | 0.19 -> master   |
     -------------------------------------
-    | 1.0.0          | 0.18 -> master   |
+    | 1.0.0          | 0.18             |
+    -------------------------------------
+    | 1.1.0          | 0.19 -> master   |
     -------------------------------------
 
 The CouchDB River allows to automatically index couchdb and make it searchable using the excellent [_changes](http://guide.couchdb.org/draft/notifications.html) stream couchdb provides. Setting it up is as simple as executing the following against elasticsearch:
@@ -120,3 +122,64 @@ Here is an example setting that disable *attachments* for all docs:
 	}
 
 Note, by default, attachments are not ignored (**false**)
+
+
+Using CouchDB Views
+====================
+
+Since 1.1.0, you can fetch documents from CouchDB views.
+
+You will have to define a view in CouchDB that can be called with the document id fetched from _changes API.
+So, CouchDB river will call your view with parameter `key="DOCID"`.
+
+As views return a collection of results (aka rows), each row is indexed with an id like DOCID_seq where seq is the sequence number of each row.
+If you get back 3 rows for one single change for document with ID=1234, the river will index 3 documents :
+
+* 1234_1
+* 1234_2
+* 1234_3
+ 
+To use it, you have to define a view in couchDB. For instance, `_design/myviews/_view/myview` with 
+
+```javascript
+function(doc) {
+ // YOUR CODE HERE
+ emit(doc._id, eval('('+YOURCODEHERE+')') );
+}
+```
+
+You can use it in your couchDb river as follow :
+
+``` javascript
+{
+  "type":"couchdb",
+  "couchdb": {
+    "host":"localhost",
+    "port":"5984",
+    "db":"mydb",
+    "view":"myviews/_view/myview",
+    "viewIgnoreRemove":false
+  }
+}
+```
+
+New options :
+
+* `view` : if not null, couchDB river will not fetch content from `_changes` API but only IDs and then will use the view to retrieve rows using the ID as a key. By default : null
+
+* `viewIgnoreRemove` : ask the river to ignore removal of rows if there is less rows after a document update. By default : false so non existing rows will be removed from elastic search.
+
+For example, with the 3 rows described earlier, if you push a new version of the document 1234 in couchDB with only 2 docs, 
+
+If `viewIgnoreRemove` is false (default), then
+
+* 1234_1 will be updated
+* 1234_2 will be updated
+* 1234_3 will be removed
+
+If `viewIgnoreRemove` is true, then
+
+* 1234_1 will be updated
+* 1234_2 will be updated
+* 1234_3 will not be updated
+
