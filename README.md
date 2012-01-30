@@ -3,15 +3,17 @@ CouchDB River Plugin for ElasticSearch
 
 The CouchDB River plugin allows to hook into couchdb `_changes` feed and automatically index it into elasticsearch.
 
-In order to install the plugin, simply run: `bin/plugin -install elasticsearch/elasticsearch-river-couchdb/1.0.0`.
+In order to install the plugin, simply run: `bin/plugin -install elasticsearch/elasticsearch-river-couchdb/1.1.0`.
 
-    ---------------------------------------
-    | memcached Plugin | ElasticSearch    |
-    ---------------------------------------
-    | master           | 0.18 -> master   |
-    ---------------------------------------
-    | 1.0.0            | 0.18 -> master   |
-    ---------------------------------------
+    -------------------------------------
+    | CouchDB Plugin | ElasticSearch    |
+    -------------------------------------
+    | master         | 0.19 -> master   |
+    -------------------------------------
+    | 1.0.0          | 0.18             |
+    -------------------------------------
+    | 1.1.0          | 0.19 -> master   |
+    -------------------------------------
 
 The CouchDB River allows to automatically index couchdb and make it searchable using the excellent [_changes](http://guide.couchdb.org/draft/notifications.html) stream couchdb provides. Setting it up is as simple as executing the following against elasticsearch:
 
@@ -103,3 +105,20 @@ To use HTTPS, pass the **protocol** field. Most likely, you will also have to ch
 	        "no_verify" : "true"
 	    }
 	}
+
+
+Ignoring Attachments
+====================
+
+You can ignore attachments as provided by couchDb for each document (`_attachments` field).
+
+Here is an example setting that disable *attachments* for all docs:
+
+	{
+	  "type":"couchdb",
+	  "couchdb": {
+	    "ignore_attachments":true
+	  }
+	}
+
+Note, by default, attachments are not ignored (**false**)
