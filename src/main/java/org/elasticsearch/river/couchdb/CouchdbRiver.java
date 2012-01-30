@@ -19,44 +19,64 @@
 
 package org.elasticsearch.river.couchdb;
 
-import org.elasticsearch.ExceptionsHelper;
-import org.elasticsearch.action.bulk.BulkResponse;
-import org.elasticsearch.action.get.GetResponse;
-import org.elasticsearch.client.Client;
-import org.elasticsearch.client.action.bulk.BulkRequestBuilder;
-import org.elasticsearch.cluster.block.ClusterBlockException;
-import org.elasticsearch.common.Base64;
-import org.elasticsearch.common.collect.Maps;
-import org.elasticsearch.common.inject.Inject;
-import org.elasticsearch.common.io.Closeables;
-import org.elasticsearch.common.unit.TimeValue;
-import org.elasticsearch.common.util.concurrent.EsExecutors;
-import org.elasticsearch.common.util.concurrent.jsr166y.LinkedTransferQueue;
-import org.elasticsearch.common.xcontent.XContentBuilder;
-import org.elasticsearch.common.xcontent.XContentFactory;
-import org.elasticsearch.common.xcontent.XContentType;
-import org.elasticsearch.common.xcontent.support.XContentMapValues;
-import org.elasticsearch.indices.IndexAlreadyExistsException;
-import org.elasticsearch.river.*;
-import org.elasticsearch.script.ExecutableScript;
-import org.elasticsearch.script.ScriptService;
+import static org.elasticsearch.client.Requests.deleteRequest;
+import static org.elasticsearch.client.Requests.indexRequest;
+import static org.elasticsearch.common.xcontent.XContentFactory.jsonBuilder;
 
-import javax.net.ssl.HostnameVerifier;
-import javax.net.ssl.HttpsURLConnection;
-import javax.net.ssl.SSLSession;
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.UnsupportedEncodingException;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
 
-import static org.elasticsearch.client.Requests.deleteRequest;
-import static org.elasticsearch.client.Requests.indexRequest;
-import static org.elasticsearch.common.xcontent.XContentFactory.jsonBuilder;
+import javax.net.ssl.HostnameVerifier;
+import javax.net.ssl.HttpsURLConnection;
+import javax.net.ssl.SSLSession;
+
+import jsr166y.LinkedTransferQueue;
+import jsr166y.TransferQueue;
+
+import org.elasticsearch.ExceptionsHelper;
+import org.elasticsearch.action.bulk.BulkRequestBuilder;
+import org.elasticsearch.action.bulk.BulkResponse;
+import org.elasticsearch.action.count.CountRequestBuilder;
+import org.elasticsearch.action.count.CountResponse;
+import org.elasticsearch.action.get.GetResponse;
+import org.elasticsearch.client.Client;
+import org.elasticsearch.client.Requests;
+import org.elasticsearch.cluster.block.ClusterBlockException;
+import org.elasticsearch.common.Base64;
+import org.elasticsearch.common.inject.Inject;
+import org.elasticsearch.common.unit.TimeValue;
+import org.elasticsearch.common.util.concurrent.EsExecutors;
+import org.elasticsearch.common.xcontent.XContentBuilder;
+import org.elasticsearch.common.xcontent.XContentFactory;
+import org.elasticsearch.common.xcontent.XContentType;
+import org.elasticsearch.common.xcontent.support.XContentMapValues;
+import org.elasticsearch.index.query.IdsQueryBuilder;
+import org.elasticsearch.index.query.QueryBuilders;
+import org.elasticsearch.indices.IndexAlreadyExistsException;
+import org.elasticsearch.river.AbstractRiverComponent;
+import org.elasticsearch.river.River;
+import org.elasticsearch.river.RiverIndexName;
+import org.elasticsearch.river.RiverName;
+import org.elasticsearch.river.RiverSettings;
+import org.elasticsearch.script.ExecutableScript;
+import org.elasticsearch.script.ScriptService;
+
+import com.google.common.collect.Maps;
+import com.google.common.io.Closeables;
 
 /**
  *
@@ -75,6 +95,8 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
     private final String couchFilterParamsUrl;
     private final String basicAuth;
     private final boolean noVerify;
+    private final String couchView;
+    private final boolean couchViewIgnoreRemove;
     private final boolean couchIgnoreAttachments;
 
     private final String indexName;
@@ -120,6 +142,8 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
             } else {
                 couchFilterParamsUrl = null;
             }
+            couchView = XContentMapValues.nodeStringValue(couchSettings.get("view"), null);
+            couchViewIgnoreRemove = XContentMapValues.nodeBooleanValue(couchSettings.get("viewIgnoreRemove"), false);
             couchIgnoreAttachments = XContentMapValues.nodeBooleanValue(couchSettings.get("ignore_attachments"), false);
             if (couchSettings.containsKey("user") && couchSettings.containsKey("password")) {
                 String user = couchSettings.get("user").toString();
@@ -141,6 +165,8 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
             couchDb = "db";
             couchFilter = null;
             couchFilterParamsUrl = null;
+            couchView = null;
+            couchViewIgnoreRemove = false;
             couchIgnoreAttachments = false;
             noVerify = false;
             basicAuth = null;
@@ -174,7 +200,7 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
 
     @Override
     public void start() {
-        logger.info("starting couchdb stream: host [{}], port [{}], filter [{}], db [{}], indexing to [{}]/[{}]", couchHost, couchPort, couchFilter, couchDb, indexName, typeName);
+        logger.info("starting couchdb stream: host [{}], port [{}], filter [{}], view [{}], db [{}], indexing to [{}]/[{}]", couchHost, couchPort, couchFilter, couchView, couchDb, indexName, typeName);
         try {
             client.admin().indices().prepareCreate(indexName).execute().actionGet();
         } catch (Exception e) {
@@ -204,6 +230,87 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
         slurperThread.interrupt();
         indexerThread.interrupt();
         closed = true;
+    }
+
+    private void processingView(String index, String type, String id, String routing, BulkRequestBuilder bulk)
+    {
+      String file = new StringBuilder().append("/").append(this.couchDb).append("/_design/").append(this.couchView).append("?key=%22").append(id).append("%22").toString();
+      String view = fetchURL(file);
+
+      Map<String, Object> ctx = null;
+      try {
+        ctx = XContentFactory.xContent(XContentType.JSON).createParser(view).mapAndClose();
+      }
+      catch (IOException e) {
+        this.logger.warn("failed to parse {}", e, new Object[] { view });
+      }
+
+      List<Object> rows = getListFromJsonNode(ctx, "rows");
+      if (!this.couchViewIgnoreRemove)
+      {
+        long oldSize = 0L;
+        try
+        {
+          IdsQueryBuilder idqb = QueryBuilders.idsQuery(new String[] { type });
+          for (int i = 0; i < 1000; i++) {
+            idqb.addIds(new String[] { new StringBuilder().append(id).append("_").append(i).toString() });
+          }
+
+          CountRequestBuilder count = this.client.prepareCount(new String[] { index }).setQuery(idqb);
+          CountResponse response = (CountResponse)count.execute().actionGet();
+          oldSize = response.count();
+        } catch (Exception e) {
+          this.logger.warn("failed to execute count", e, new Object[0]);
+        }
+
+        if (rows.size() < oldSize) {
+          for (int i = rows.size() + 1; i < oldSize + 1L; i++) {
+            bulk.add(Requests.deleteRequest(index).type(type).id(new StringBuilder().append(id).append("_").append(i).toString()).routing(routing));
+          }
+        }
+      }
+
+      int rownum = 1;
+      for (Iterator<Object> it = rows.iterator(); it.hasNext(); ) { 
+    	  Object object = it.next();
+			if ((object instanceof Map)) {
+				Map<String, Object> row = (Map<String, Object>) object;
+				Map<String, Object> value = getMapFromJsonNode(row, "value");
+				if (value != null) {
+					if (this.logger.isTraceEnabled()) {
+						this.logger.trace("row found {}",
+								new Object[] { value });
+					}
+
+					bulk.add(Requests
+							.indexRequest(index)
+							.type(type)
+							.id(new StringBuilder().append(id).append("_")
+									.append(rownum++).toString()).source(value)
+							.routing(routing));
+				}
+			}
+		}
+    }
+
+    private Map<String, Object> getMapFromJsonNode(Map<String, Object> ctx, String node)
+    {
+      if (!ctx.containsKey(node)) {
+        this.logger.warn(new StringBuilder().append(node).append(" does not exist {}").toString(), new Object[] { ctx });
+        return new HashMap<String, Object>();
+      }
+      Map<String, Object> doc = (Map<String, Object>) ctx.get(node);
+      return doc;
+    }
+
+    private List<Object> getListFromJsonNode(Map<String, Object> ctx, String node)
+    {
+      if (!ctx.containsKey(node)) {
+        this.logger.warn(new StringBuilder().append(node).append(" does not exist {}").toString(), new Object[] { ctx });
+        return new ArrayList<Object>();
+      }
+      List<Object> doc = (List)ctx.get(node);
+      return doc;
     }
 
     @SuppressWarnings({"unchecked"})
@@ -251,28 +358,46 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
                 logger.trace("processing [delete]: [{}]/[{}]/[{}]", index, type, id);
             }
             bulk.add(deleteRequest(index).type(type).id(id).routing(extractRouting(ctx)).parent(extractParent(ctx)));
-        } else if (ctx.containsKey("doc")) {
-            String index = extractIndex(ctx);
-            String type = extractType(ctx);
-            Map<String, Object> doc = (Map<String, Object>) ctx.get("doc");
+		} else {
+			String index = extractIndex(ctx);
+			String type = extractType(ctx);
+			if (this.couchView == null) {
+				if (ctx.containsKey("doc")) {
+					Map<String, Object> doc = (Map<String, Object>) ctx.get("doc");
 
-            // Remove _attachment from doc if needed
-            if (couchIgnoreAttachments) {
-                // no need to log that we removed it, the doc indexed will be shown without it
-                doc.remove("_attachments");
-            } else {
-                // TODO by now, couchDB river does not really store attachments but only attachments meta infomration
-                // So we perhaps need to fully support attachments
-            }
+					// Remove _attachment from doc if needed
+					if (couchIgnoreAttachments) {
+						// no need to log that we removed it, the doc indexed
+						// will
+						// be shown without it
+						doc.remove("_attachments");
+					} else {
+						// TODO by now, couchDB river does not really store
+						// attachments but only attachments meta information
+						// So we perhaps need to fully support attachments
+					}
 
-            if (logger.isTraceEnabled()) {
-                logger.trace("processing [index ]: [{}]/[{}]/[{}], source {}", index, type, id, doc);
-            }
+					if (logger.isTraceEnabled()) {
+						logger.trace(
+								"processing [index ]: [{}]/[{}]/[{}], source {}",
+								index, type, id, doc);
+					}
 
-            bulk.add(indexRequest(index).type(type).id(id).source(doc).routing(extractRouting(ctx)).parent(extractParent(ctx)));
-        } else {
-            logger.warn("ignoring unknown change {}", s);
-        }
+					bulk.add(indexRequest(index).type(type).id(id).source(doc)
+							.routing(extractRouting(ctx))
+							.parent(extractParent(ctx)));
+				} else {
+					logger.warn("ignoring unknown change {}", s);
+				}
+			} else {
+				if (this.logger.isTraceEnabled()) {
+					this.logger.trace("processing view [index ]: [{}]/[{}]/[{}], view {}", index, type, id,	this.couchView);
+				}
+
+				processingView(index, type, id, extractRouting(ctx), bulk);
+			}
+		}
+
         return seq;
     }
 
@@ -300,6 +425,92 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
         return index;
     }
 
+    private String fetchURL(String file)
+    {
+      return fetchURL(file, null);
+    }
+
+	private String fetchURL(String file, TransferQueue<String> tqueue) {
+		StringBuffer sbf = new StringBuffer();
+
+		if (this.logger.isDebugEnabled()) {
+			this.logger.debug(
+					"using host [{}], port [{}], path [{}]",
+					new Object[] { this.couchHost,
+							Integer.valueOf(this.couchPort), file });
+		}
+
+		HttpURLConnection connection = null;
+		InputStream is = null;
+		try {
+			URL url = new URL("http", this.couchHost, this.couchPort, file);
+			connection = (HttpURLConnection) url.openConnection();
+			if (this.basicAuth != null) {
+				connection.addRequestProperty("Authorization", this.basicAuth);
+			}
+			connection.setDoInput(true);
+			connection.setUseCaches(false);
+			is = connection.getInputStream();
+
+			BufferedReader reader = new BufferedReader(new InputStreamReader(
+					is, "UTF-8"));
+			String line;
+			while ((line = reader.readLine()) != null) {
+				if (this.closed) {
+					String str1 = sbf.toString();
+					return str1;
+				}
+				if (line.length() == 0) {
+					this.logger.trace("[couchdb] heartbeat", new Object[0]);
+					continue;
+				}
+				if (this.logger.isTraceEnabled()) {
+					this.logger.trace("[couchdb] {}", new Object[] { line });
+				}
+				if (tqueue != null) {
+					tqueue.add(line);
+					continue;
+				}
+				sbf.append(line);
+			}
+		} catch (Exception e) {
+			Closeables.closeQuietly(is);
+			if (connection != null) {
+				try {
+					connection.disconnect();
+				} catch (Exception e1) {
+				} finally {
+					connection = null;
+				}
+			}
+			if (this.closed) {
+				return sbf.toString();
+			}
+			this.logger.warn(
+					"failed to read from _changes or view, throttling....", e,
+					new Object[0]);
+			try {
+				Thread.sleep(5000L);
+			} catch (InterruptedException e1) {
+				if (this.closed) {
+					Closeables.closeQuietly(is);
+				}
+			}
+		} finally {
+			Closeables.closeQuietly(is);
+			if (connection != null) {
+				try {
+					connection.disconnect();
+				} catch (Exception e1) {
+				} finally {
+					connection = null;
+				}
+			}
+		}
+
+		return sbf.toString();
+	}
+    
     private class Indexer implements Runnable {
         @Override
         public void run() {
@@ -419,7 +630,11 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
                     }
                 }
 
-                String file = "/" + couchDb + "/_changes?feed=continuous&include_docs=true&heartbeat=10000";
+                String file = "/" + couchDb + "/_changes?feed=continuous&heartbeat=10000";
+                if (CouchdbRiver.this.couchView == null) {
+                  file = file + "&include_docs=true";
+                }
+                
                 if (couchFilter != null) {
                     try {
                         file = file + "&filter=" + URLEncoder.encode(couchFilter, "UTF-8");
