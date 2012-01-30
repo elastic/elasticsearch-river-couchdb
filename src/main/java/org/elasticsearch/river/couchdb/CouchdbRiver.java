@@ -65,6 +65,7 @@ import org.elasticsearch.common.xcontent.XContentFactory;
 import org.elasticsearch.common.xcontent.XContentType;
 import org.elasticsearch.common.xcontent.support.XContentMapValues;
 import org.elasticsearch.index.query.IdsQueryBuilder;
+import org.elasticsearch.index.query.PrefixQueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
 import org.elasticsearch.indices.IndexAlreadyExistsException;
 import org.elasticsearch.river.AbstractRiverComponent;
@@ -251,12 +252,11 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
         long oldSize = 0L;
         try
         {
-          IdsQueryBuilder idqb = QueryBuilders.idsQuery(new String[] { type });
-          for (int i = 0; i < 1000; i++) {
-            idqb.addIds(new String[] { new StringBuilder().append(id).append("_").append(i).toString() });
-          }
+        	PrefixQueryBuilder pqb = QueryBuilders.prefixQuery(
+        			new StringBuilder().append(type).append("._id").toString(),
+        			new StringBuilder().append(id).append("_").toString());
 
-          CountRequestBuilder count = this.client.prepareCount(new String[] { index }).setQuery(idqb);
+          CountRequestBuilder count = this.client.prepareCount(new String[] { index }).setQuery(pqb);
           CountResponse response = (CountResponse)count.execute().actionGet();
           oldSize = response.count();
         } catch (Exception e) {

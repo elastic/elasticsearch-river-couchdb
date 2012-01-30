@@ -30,18 +30,12 @@ import org.elasticsearch.node.NodeBuilder;
 
 /**
  * This is a simple test case for testing views.<br>
- * You may have a couchdb instance running on localhost:5984 with a mytest database.<br>
- * You have to define a view named vues/myview
+ * You may have a couchdb instance running on localhost:5984 with a mydb database.<br>
+ * You have to define a view named myviews/myview
  * <pre>
 function(doc) {
-listArt=doc.document.articles;
-
-for(var i=0; i<listArt.length;i++) {  
- var artJson = {};
- artJson = { 'docid' : doc._id, 'num' : listArt[i].numeroArticle };
- artJson =  JSON.stringify( artJson );
- emit(doc._id, eval('('+artJson+')') );
-};
+ // YOUR CODE HERE
+ emit(doc._id, eval('('+YOURCODEHERE+')') );
 }</pre>
  * @author dadoonet (David Pilato)
  */
@@ -50,8 +44,8 @@ public class CouchdbRiverViewTest {
     public static void main(String[] args) throws Exception {
     	String host = "localhost";
     	String port = "5984";
-    	String db = "dau_test";
-    	String view = "vues/_view/test_articles";
+    	String db = "mydb";
+    	String view = "myviews/_view/myview";
     	boolean viewIgnoreRemove = false;
     	
         Node node = NodeBuilder.nodeBuilder().settings(ImmutableSettings.settingsBuilder().put("gateway.type", "local")).node();
