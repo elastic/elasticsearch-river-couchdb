@@ -20,7 +20,6 @@
 package org.elasticsearch.plugin.river.couchdb;
 
 import org.elasticsearch.common.inject.Inject;
-import org.elasticsearch.common.inject.Module;
 import org.elasticsearch.plugins.AbstractPlugin;
 import org.elasticsearch.river.RiversModule;
 import org.elasticsearch.river.couchdb.CouchdbRiverModule;
@@ -44,11 +43,7 @@ public class CouchdbRiverPlugin extends AbstractPlugin {
         return "River CouchDB Plugin";
     }
 
-
-    @Override
-    public void processModule(Module module) {
-        if (module instanceof RiversModule) {
-            ((RiversModule) module).registerRiver("couchdb", CouchdbRiverModule.class);
-        }
+    public void onModule(RiversModule module) {
+        module.registerRiver("couchdb", CouchdbRiverModule.class);
     }
 }

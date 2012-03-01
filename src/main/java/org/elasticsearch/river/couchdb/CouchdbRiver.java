@@ -44,9 +44,6 @@ import javax.net.ssl.HostnameVerifier;
 import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.SSLSession;
 
-import jsr166y.LinkedTransferQueue;
-import jsr166y.TransferQueue;
-
 import org.elasticsearch.ExceptionsHelper;
 import org.elasticsearch.action.bulk.BulkRequestBuilder;
 import org.elasticsearch.action.bulk.BulkResponse;
@@ -57,14 +54,17 @@ import org.elasticsearch.client.Client;
 import org.elasticsearch.client.Requests;
 import org.elasticsearch.cluster.block.ClusterBlockException;
 import org.elasticsearch.common.Base64;
+import org.elasticsearch.common.collect.Maps;
 import org.elasticsearch.common.inject.Inject;
+import org.elasticsearch.common.io.Closeables;
 import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.common.util.concurrent.EsExecutors;
+import org.elasticsearch.common.util.concurrent.jsr166y.LinkedTransferQueue;
+import org.elasticsearch.common.util.concurrent.jsr166y.TransferQueue;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.common.xcontent.XContentFactory;
 import org.elasticsearch.common.xcontent.XContentType;
 import org.elasticsearch.common.xcontent.support.XContentMapValues;
-import org.elasticsearch.index.query.IdsQueryBuilder;
 import org.elasticsearch.index.query.PrefixQueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
 import org.elasticsearch.indices.IndexAlreadyExistsException;
@@ -75,9 +75,6 @@ import org.elasticsearch.river.RiverName;
 import org.elasticsearch.river.RiverSettings;
 import org.elasticsearch.script.ExecutableScript;
 import org.elasticsearch.script.ScriptService;
-
-import com.google.common.collect.Maps;
-import com.google.common.io.Closeables;
 
 /**
  *
