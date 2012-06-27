@@ -66,6 +66,8 @@ Filtering can also be performed by providing a script (default to JavaScript) th
 
 Note, this feature requires the `lang-javascript` plugin.
 
+Any other script language supported by ElasticSearch may be used by setting the `scriptType` parameter to the appropriate value. If unspecified, the defualt is "js" (javascript). See http://www.elasticsearch.org/guide/reference/modules/scripting.html for details. 
+
 The **ctx.doc** can be changed and its value can will be indexed (assuming its not a deleted change). Also, if **ctx.ignore** is set to true, the change seq will be ignore and not applied.
 
 Other possible values that can be set are **ctx.index** to control the index name to index the doc into, **ctx.type** to control the (mapping) type to index into, **ctx._parent** and **ctx._routing**.
