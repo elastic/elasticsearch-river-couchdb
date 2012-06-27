@@ -130,7 +130,12 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
             }
 
             if (couchSettings.containsKey("script")) {
-                script = scriptService.executable("js", couchSettings.get("script").toString(), Maps.newHashMap());
+                String scriptType = "js";
+                if(couchSettings.containsKey("scriptType")) {
+                    scriptType = couchSettings.get("scriptType").toString();
+                }
+
+                script = scriptService.executable(scriptType, couchSettings.get("script").toString(), Maps.newHashMap());
             } else {
                 script = null;
             }
