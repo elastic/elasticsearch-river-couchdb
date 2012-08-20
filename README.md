@@ -178,7 +178,7 @@ definition like this:
 }
 ```
 
-Setting  `ctx._type` tells Elasitcsearch what type in the index to use.
+Setting  `ctx._type` tells Elasticsearch what type in the index to use.
 So if doc.type for a CouchDB changeset is "book" then Elasticsearch will
 index it as the "book" type.
 
