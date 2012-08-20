@@ -125,6 +125,97 @@ Here is an example setting that disable *attachments* for all docs:
 
 Note, by default, attachments are not ignored (**false**)
 
+
+Examples
+========
+
+
+Indexing Databases with Multiple Types
+-------------------------------------
+
+A common pattern in CouchDB is to have a single database hold documents
+of multiple types. Typically each document will have a field containing
+the type of the document.
+
+For example, a database of products from Amazon might have a book type:
+
+```json
+{
+  "_id": 1,
+  "type" : "book",
+  "author" : "Michael McCandless",
+  "title" : "Lucene in Action"
+}
+```
+
+and a CD type:
+
+```json
+{
+  "_id": 2,
+  "type" : "cd",
+  "artist" : "Tool",
+  "title" : "Undertow"
+}
+```
+
+Elasticsearch also supports multiple types in the same index and we need
+to tell ES where each type from CouchDB goes. You do this with a river
+definition like this:
+
+```json
+{
+  "type" : "couchdb",
+  "couchdb" : {
+    "host" : "localhost",
+    "port" : 5984,
+    "db" : "amazon",
+    "script" : "ctx._type = ctx.doc.type"
+  },
+  "index" : {
+    "index" : "amazon"
+  }
+}
+```
+
+Setting  `ctx._type` tells Elasitcsearch what type in the index to use.
+So if doc.type for a CouchDB changeset is "book" then Elasticsearch will
+index it as the "book" type.
+
+The script block can be expanded to handle more complicated cases if
+your types don't map one-to-one between the systems.
+
+If you need to also handle deleting documents from the right type in
+Elasticsearch, be aware that the above setup requires you to delete
+documents from CouchDB in a special way. If you use the `DELETE` `HTTP`
+verb with CouchDB you will break the above river as ES will be unable
+to determine what type you're trying to delete. Instead you must
+preserve some information about the document you deleted by using the
+CouchDB bulk document interface.
+
+For example, to delete the above "cd" document, you must do something
+like this:
+
+```json
+POST /amazon/_bulkdocs HTTP/1.1
+
+{
+  "docs" : [
+    {
+        "_id: 2,
+        "_rev" : "rev",
+        "_deleted" : true,
+        "type" : "cd"
+    }
+  ]
+}
+```
+
+This deletes the document while preserving the type information for ES.
+You can extend this technique to store more data in deleted documents
+but be aware of the disk space usage.
+
+
 License
 -------
 
