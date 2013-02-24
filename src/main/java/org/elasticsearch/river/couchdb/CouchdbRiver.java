@@ -406,8 +406,8 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
                 try {
                     client.admin().indices().prepareRefresh(riverIndexName).execute().actionGet();
                     GetResponse lastSeqGetResponse = client.prepareGet(riverIndexName, riverName().name(), "_seq").execute().actionGet();
-                    if (lastSeqGetResponse.exists()) {
-                        Map<String, Object> couchdbState = (Map<String, Object>) lastSeqGetResponse.sourceAsMap().get("couchdb");
+                    if (lastSeqGetResponse.isExists()) {
+                        Map<String, Object> couchdbState = (Map<String, Object>) lastSeqGetResponse.getSourceAsMap().get("couchdb");
                         if (couchdbState != null) {
                             lastSeq = couchdbState.get("last_seq").toString(); // we know its always a string
                         }
