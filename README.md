@@ -125,8 +125,9 @@ Here is an example setting that disable *attachments* for all docs:
 
 Note, by default, attachments are not ignored (**false**)
 
+
 License
--------
+=======
 
     This software is licensed under the Apache 2 license, quoted below.
 
