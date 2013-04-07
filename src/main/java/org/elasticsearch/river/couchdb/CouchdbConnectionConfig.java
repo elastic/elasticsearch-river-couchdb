@@ -19,6 +19,7 @@ public class CouchdbConnectionConfig {
     public static final String PASSWORD = "password";
 
     private static final String DEFAULT_URL = "http://localhost:5984";
+
     private URL url = asUrl(DEFAULT_URL);
     private String username;
     private String password;
