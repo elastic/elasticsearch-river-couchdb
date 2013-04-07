@@ -45,7 +45,7 @@ public class CouchdbDatabaseConfig {
                 cfg.filterParams = (Map<String, String>) couchSettings.get(FILTER_PARAMS);
             }
 
-            cfg.ignoreAttachments = nodeBooleanValue(couchSettings.get(IGNORE_ATTACHMENTS), false);
+            cfg.ignoreAttachments = nodeBooleanValue(couchSettings.get(IGNORE_ATTACHMENTS));
 
             if (couchSettings.containsKey(SCRIPT)) {
                 cfg.script = nodeStringValue(couchSettings.get(SCRIPT), null);

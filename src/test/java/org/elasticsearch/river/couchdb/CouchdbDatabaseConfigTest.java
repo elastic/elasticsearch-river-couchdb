@@ -18,6 +18,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.runners.MockitoJUnitRunner;
+import java.util.HashMap;
 import java.util.Map;
 
 @RunWith(MockitoJUnitRunner.class)
@@ -72,6 +73,21 @@ public class CouchdbDatabaseConfigTest {
 
         // then
         verify(scriptService).executable(eq(testScriptType), eq(testScript), any(Map.class));
+    }
+
+    @Test
+    public void shouldHaveDefaultValues() {
+        // given
+        RiverSettings riverSettings = new RiverSettings(null, new HashMap<String, Object>());
+
+        // when
+        CouchdbDatabaseConfig cfg = fromRiverSettings(riverSettings);
+
+        // then
+        assertThat(cfg.shouldUseScript()).isFalse();
+        assertThat(cfg.shouldUseFilter()).isFalse();
+        assertThat(cfg.shouldIgnoreAttachments()).isTrue();
+        assertThat(cfg.getDatabase()).isEqualTo("db");
     }
 
     private RiverSettings customRiverSettings() {
