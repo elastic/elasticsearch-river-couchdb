@@ -25,22 +25,17 @@ import org.elasticsearch.action.bulk.BulkResponse;
 import org.elasticsearch.action.get.GetResponse;
 import org.elasticsearch.client.Client;
 import org.elasticsearch.cluster.block.ClusterBlockException;
-import org.elasticsearch.common.Base64;
-import org.elasticsearch.common.collect.Maps;
 import org.elasticsearch.common.inject.Inject;
 import org.elasticsearch.common.io.Closeables;
-import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.common.util.concurrent.EsExecutors;
 import org.elasticsearch.common.util.concurrent.jsr166y.LinkedTransferQueue;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.common.xcontent.XContentFactory;
 import org.elasticsearch.common.xcontent.XContentType;
-import org.elasticsearch.common.xcontent.support.XContentMapValues;
 import org.elasticsearch.indices.IndexAlreadyExistsException;
 import org.elasticsearch.river.*;
 import org.elasticsearch.script.ExecutableScript;
 import org.elasticsearch.script.ScriptService;
-
 import javax.net.ssl.HostnameVerifier;
 import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.SSLSession;
@@ -53,7 +48,6 @@ import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
-
 import static org.elasticsearch.client.Requests.deleteRequest;
 import static org.elasticsearch.client.Requests.indexRequest;
 import static org.elasticsearch.common.xcontent.XContentFactory.jsonBuilder;
@@ -67,121 +61,38 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
 
     private final String riverIndexName;
 
-    private final String couchProtocol;
-    private final String couchHost;
-    private final int couchPort;
-    private final String couchDb;
-    private final String couchFilter;
-    private final String couchFilterParamsUrl;
-    private final String basicAuth;
-    private final boolean noVerify;
-    private final boolean couchIgnoreAttachments;
-
-    private final String indexName;
-    private final String typeName;
-    private final int bulkSize;
-    private final TimeValue bulkTimeout;
-    private final int throttleSize;
-
-    private final ExecutableScript script;
+    private final IndexConfig indexConfig;
+    private final CouchdbConnectionConfig connectionConfig;
+    private final CouchdbDatabaseConfig databaseConfig;
 
     private volatile Thread slurperThread;
     private volatile Thread indexerThread;
     private volatile boolean closed;
 
-    private final BlockingQueue<String> stream;
+    private BlockingQueue<String> stream;
+    private final ExecutableScript script;
 
-    @SuppressWarnings({"unchecked"})
     @Inject
-    public CouchdbRiver(RiverName riverName, RiverSettings settings, @RiverIndexName String riverIndexName, Client client, ScriptService scriptService) {
-        super(riverName, settings);
+    public CouchdbRiver(RiverName riverName, RiverSettings riverSettings, @RiverIndexName String riverIndexName,
+                        Client client, ScriptService scriptService) {
+        super(riverName, riverSettings);
         this.riverIndexName = riverIndexName;
         this.client = client;
 
-        if (settings.settings().containsKey("couchdb")) {
-            Map<String, Object> couchSettings = (Map<String, Object>) settings.settings().get("couchdb");
-            couchProtocol = XContentMapValues.nodeStringValue(couchSettings.get("protocol"), "http");
-            noVerify = XContentMapValues.nodeBooleanValue(couchSettings.get("no_verify"), false);
-            couchHost = XContentMapValues.nodeStringValue(couchSettings.get("host"), "localhost");
-            couchPort = XContentMapValues.nodeIntegerValue(couchSettings.get("port"), 5984);
-            couchDb = XContentMapValues.nodeStringValue(couchSettings.get("db"), riverName.name());
-            couchFilter = XContentMapValues.nodeStringValue(couchSettings.get("filter"), null);
-            if (couchSettings.containsKey("filter_params")) {
-                Map<String, Object> filterParams = (Map<String, Object>) couchSettings.get("filter_params");
-                StringBuilder sb = new StringBuilder();
-                for (Map.Entry<String, Object> entry : filterParams.entrySet()) {
-                    try {
-                        sb.append("&").append(URLEncoder.encode(entry.getKey(), "UTF-8")).append("=").append(URLEncoder.encode(entry.getValue().toString(), "UTF-8"));
-                    } catch (UnsupportedEncodingException e) {
-                        // should not happen...
-                    }
-                }
-                couchFilterParamsUrl = sb.toString();
-            } else {
-                couchFilterParamsUrl = null;
-            }
-            couchIgnoreAttachments = XContentMapValues.nodeBooleanValue(couchSettings.get("ignore_attachments"), false);
-            if (couchSettings.containsKey("user") && couchSettings.containsKey("password")) {
-                String user = couchSettings.get("user").toString();
-                String password = couchSettings.get("password").toString();
-                basicAuth = "Basic " + Base64.encodeBytes((user + ":" + password).getBytes());
-            } else {
-                basicAuth = null;
-            }
-
-            if (couchSettings.containsKey("script")) {
-                String scriptType = "js";
-                if(couchSettings.containsKey("scriptType")) {
-                    scriptType = couchSettings.get("scriptType").toString();
-                }
-
-                script = scriptService.executable(scriptType, couchSettings.get("script").toString(), Maps.newHashMap());
-            } else {
-                script = null;
-            }
-        } else {
-            couchProtocol = "http";
-            couchHost = "localhost";
-            couchPort = 5984;
-            couchDb = "db";
-            couchFilter = null;
-            couchFilterParamsUrl = null;
-            couchIgnoreAttachments = false;
-            noVerify = false;
-            basicAuth = null;
-            script = null;
-        }
-
-        if (settings.settings().containsKey("index")) {
-            Map<String, Object> indexSettings = (Map<String, Object>) settings.settings().get("index");
-            indexName = XContentMapValues.nodeStringValue(indexSettings.get("index"), couchDb);
-            typeName = XContentMapValues.nodeStringValue(indexSettings.get("type"), couchDb);
-            bulkSize = XContentMapValues.nodeIntegerValue(indexSettings.get("bulk_size"), 100);
-            if (indexSettings.containsKey("bulk_timeout")) {
-                bulkTimeout = TimeValue.parseTimeValue(XContentMapValues.nodeStringValue(indexSettings.get("bulk_timeout"), "10ms"), TimeValue.timeValueMillis(10));
-            } else {
-                bulkTimeout = TimeValue.timeValueMillis(10);
-            }
-            throttleSize = XContentMapValues.nodeIntegerValue(indexSettings.get("throttle_size"), bulkSize * 5);
-        } else {
-            indexName = couchDb;
-            typeName = couchDb;
-            bulkSize = 100;
-            bulkTimeout = TimeValue.timeValueMillis(10);
-            throttleSize = bulkSize * 5;
-        }
-        if (throttleSize == -1) {
-            stream = new LinkedTransferQueue<String>();
-        } else {
-            stream = new ArrayBlockingQueue<String>(throttleSize);
-        }
+        indexConfig = IndexConfig.fromRiverSettings(riverSettings);
+        connectionConfig = CouchdbConnectionConfig.fromRiverSettings(riverSettings);
+        databaseConfig = CouchdbDatabaseConfig.fromRiverSettings(riverSettings);
+        script = databaseConfig.getScript(scriptService);
     }
 
     @Override
     public void start() {
-        logger.info("starting couchdb stream: host [{}], port [{}], filter [{}], db [{}], indexing to [{}]/[{}]", couchHost, couchPort, couchFilter, couchDb, indexName, typeName);
+        initializeStream();
+
+        logger.info("starting couchdb stream: url [{}], database [{}], indexing to [{}]/[{}]",
+                connectionConfig.getUrl(), databaseConfig.getDatabase(), indexConfig.getName(), indexConfig.getType());
         try {
-            client.admin().indices().prepareCreate(indexName).execute().actionGet();
+            client.admin().indices().prepareCreate(indexConfig.getName()).execute().actionGet();
         } catch (Exception e) {
             if (ExceptionsHelper.unwrapCause(e) instanceof IndexAlreadyExistsException) {
                 // that's fine
@@ -189,7 +100,7 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
                 // ok, not recovered yet..., lets start indexing and hope we recover by the first bulk
                 // TODO: a smarter logic can be to register for cluster event listener here, and only start sampling when the block is removed...
             } else {
-                logger.warn("failed to create index [{}], disabling river...", e, indexName);
+                logger.warn("failed to create index [{}], disabling river...", e, indexConfig.getName());
                 return;
             }
         }
@@ -198,6 +109,14 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
         indexerThread = EsExecutors.daemonThreadFactory(settings.globalSettings(), "couchdb_river_indexer").newThread(new Indexer());
         indexerThread.start();
         slurperThread.start();
+    }
+
+    public void initializeStream() {
+        if (indexConfig.getThrottleSize() > 0) {
+            stream = new ArrayBlockingQueue<String>(indexConfig.getThrottleSize());
+        } else {
+            stream = new LinkedTransferQueue<String>();
+        }
     }
 
     @Override
@@ -262,7 +181,7 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
             Map<String, Object> doc = (Map<String, Object>) ctx.get("doc");
 
             // Remove _attachment from doc if needed
-            if (couchIgnoreAttachments) {
+            if (databaseConfig.shouldIgnoreAttachments()) {
                 // no need to log that we removed it, the doc indexed will be shown without it
                 doc.remove("_attachments");
             } else {
@@ -292,7 +211,7 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
     private String extractType(Map<String, Object> ctx) {
         String type = (String) ctx.get("_type");
         if (type == null) {
-            type = typeName;
+            type = indexConfig.getType();
         }
         return type;
     }
@@ -300,7 +219,7 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
     private String extractIndex(Map<String, Object> ctx) {
         String index = (String) ctx.get("_index");
         if (index == null) {
-            index = indexName;
+            index = indexConfig.getName();
         }
         return index;
     }
@@ -330,13 +249,13 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
 
                 // spin a bit to see if we can get some more changes
                 try {
-                    while ((s = stream.poll(bulkTimeout.millis(), TimeUnit.MILLISECONDS)) != null) {
+                    while ((s = stream.poll(indexConfig.getBulkTimeout().millis(), TimeUnit.MILLISECONDS)) != null) {
                         lineSeq = processLine(s, bulk);
                         if (lineSeq != null) {
                             lastSeq = lineSeq;
                         }
 
-                        if (bulk.numberOfActions() >= bulkSize) {
+                        if (bulk.numberOfActions() >= indexConfig.getBulkSize()) {
                             break;
                         }
                     }
@@ -424,16 +343,9 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
                     }
                 }
 
-                String file = "/" + couchDb + "/_changes?feed=continuous&include_docs=true&heartbeat=10000";
-                if (couchFilter != null) {
-                    try {
-                        file = file + "&filter=" + URLEncoder.encode(couchFilter, "UTF-8");
-                    } catch (UnsupportedEncodingException e) {
-                        // should not happen!
-                    }
-                    if (couchFilterParamsUrl != null) {
-                        file = file + couchFilterParamsUrl;
-                    }
+                String file = "/" + databaseConfig.getDatabase() + "/_changes?feed=continuous&include_docs=true&heartbeat=10000";
+                if (databaseConfig.shouldUseFilter()) {
+                    file += databaseConfig.buildFilterUrlParams();
                 }
 
                 if (lastSeq != null) {
@@ -446,21 +358,22 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
                 }
 
                 if (logger.isDebugEnabled()) {
-                    logger.debug("using host [{}], port [{}], path [{}]", couchHost, couchPort, file);
+                    logger.debug("using url [{}], path [{}]", connectionConfig.getUrl(), file);
                 }
 
                 HttpURLConnection connection = null;
                 InputStream is = null;
                 try {
-                    URL url = new URL(couchProtocol, couchHost, couchPort, file);
+                    URL url = new URL(connectionConfig.getUrl(), file);
                     connection = (HttpURLConnection) url.openConnection();
-                    if (basicAuth != null) {
-                        connection.addRequestProperty("Authorization", basicAuth);
+
+                    if (connectionConfig.requiresAuthentication()) {
+                        connection.addRequestProperty("Authorization", connectionConfig.getBasicAuthHeader());
                     }
                     connection.setDoInput(true);
                     connection.setUseCaches(false);
 
-                    if (noVerify) {
+                    if (!connectionConfig.shouldVerifyHostname()) {
                         ((HttpsURLConnection) connection).setHostnameVerifier(
                                 new HostnameVerifier() {
                                     public boolean verify(String string, SSLSession ssls) {
