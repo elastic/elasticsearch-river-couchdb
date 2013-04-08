@@ -20,7 +20,7 @@ public class CouchdbDatabaseConfig {
     public static final String SCRIPT_TYPE = "scriptType";
     public static final String IGNORE_ATTACHMENTS = "ignore_attachments";
 
-    private static final String DEFAULT_DATABASE = "db";
+    static final String DEFAULT_DATABASE = "db";
 
     private String database = DEFAULT_DATABASE;
     private boolean ignoreAttachments = true;

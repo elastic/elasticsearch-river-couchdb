@@ -3,6 +3,7 @@ package org.elasticsearch.river.couchdb;
 import static org.elasticsearch.common.collect.Maps.newHashMap;
 import static org.elasticsearch.river.couchdb.CouchdbDatabaseConfig.COUCHDB_DATABASE;
 import static org.elasticsearch.river.couchdb.CouchdbDatabaseConfig.DATABASE;
+import static org.elasticsearch.river.couchdb.CouchdbDatabaseConfig.DEFAULT_DATABASE;
 import static org.elasticsearch.river.couchdb.CouchdbDatabaseConfig.FILTER;
 import static org.elasticsearch.river.couchdb.CouchdbDatabaseConfig.FILTER_PARAMS;
 import static org.elasticsearch.river.couchdb.CouchdbDatabaseConfig.SCRIPT;
@@ -87,7 +88,7 @@ public class CouchdbDatabaseConfigTest {
         assertThat(cfg.shouldUseScript()).isFalse();
         assertThat(cfg.shouldUseFilter()).isFalse();
         assertThat(cfg.shouldIgnoreAttachments()).isTrue();
-        assertThat(cfg.getDatabase()).isEqualTo("db");
+        assertThat(cfg.getDatabase()).isEqualTo(DEFAULT_DATABASE);
     }
 
     private RiverSettings customRiverSettings() {
