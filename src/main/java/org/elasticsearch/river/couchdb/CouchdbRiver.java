@@ -27,7 +27,6 @@ import org.elasticsearch.client.Client;
 import org.elasticsearch.cluster.block.ClusterBlockException;
 import org.elasticsearch.common.inject.Inject;
 import org.elasticsearch.common.io.Closeables;
-import org.elasticsearch.common.util.concurrent.EsExecutors;
 import org.elasticsearch.common.util.concurrent.jsr166y.LinkedTransferQueue;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.common.xcontent.XContentFactory;
@@ -47,9 +46,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import static org.elasticsearch.client.Requests.deleteRequest;
 import static org.elasticsearch.client.Requests.indexRequest;
+import static org.elasticsearch.common.collect.Lists.newArrayList;
+import static org.elasticsearch.common.util.concurrent.EsExecutors.daemonThreadFactory;
 import static org.elasticsearch.common.xcontent.XContentFactory.jsonBuilder;
 
 /**
@@ -65,8 +67,7 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
     private final CouchdbConnectionConfig connectionConfig;
     private final CouchdbDatabaseConfig databaseConfig;
 
-    private volatile Thread slurperThread;
-    private volatile Thread indexerThread;
+    private List<Thread> threads = newArrayList();
     private volatile boolean closed;
 
     private BlockingQueue<String> stream;
@@ -105,10 +106,15 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
             }
         }
 
-        slurperThread = EsExecutors.daemonThreadFactory(settings.globalSettings(), "couchdb_river_slurper").newThread(new Slurper());
-        indexerThread = EsExecutors.daemonThreadFactory(settings.globalSettings(), "couchdb_river_indexer").newThread(new Indexer());
-        indexerThread.start();
-        slurperThread.start();
+        ThreadFactory slurperFactory = daemonThreadFactory(settings.globalSettings(), "couchdb_river_slurper");
+        ThreadFactory indexerFactory = daemonThreadFactory(settings.globalSettings(), "couchdb_river_indexer");
+
+        threads.add(slurperFactory.newThread(new Slurper()));
+        threads.add(indexerFactory.newThread(new Indexer()));
+
+        for (Thread thread : threads) {
+            thread.start();
+        }
     }
 
     public void initializeStream() {
@@ -121,13 +127,13 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
 
     @Override
     public void close() {
-        if (closed) {
-            return;
+        if (!closed) {
+            logger.info("closing couchdb stream river");
+            for (Thread thread : threads) {
+                thread.interrupt();
+            }
+            closed = true;
         }
-        logger.info("closing couchdb stream river");
-        slurperThread.interrupt();
-        indexerThread.interrupt();
-        closed = true;
     }
 
     @SuppressWarnings({"unchecked"})
