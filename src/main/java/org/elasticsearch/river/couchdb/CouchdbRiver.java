@@ -19,7 +19,6 @@
 
 package org.elasticsearch.river.couchdb;
 
-import org.elasticsearch.ExceptionsHelper;
 import org.elasticsearch.action.bulk.BulkRequestBuilder;
 import org.elasticsearch.action.bulk.BulkResponse;
 import org.elasticsearch.action.get.GetResponse;
@@ -48,11 +47,14 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import static org.elasticsearch.ExceptionsHelper.unwrapCause;
 import static org.elasticsearch.client.Requests.deleteRequest;
 import static org.elasticsearch.client.Requests.indexRequest;
+import static org.elasticsearch.common.base.Throwables.propagate;
 import static org.elasticsearch.common.collect.Lists.newArrayList;
 import static org.elasticsearch.common.util.concurrent.EsExecutors.daemonThreadFactory;
 import static org.elasticsearch.common.xcontent.XContentFactory.jsonBuilder;
+import static org.elasticsearch.river.couchdb.util.Sleeper.sleepLong;
 
 /**
  *
@@ -90,21 +92,7 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
     public void start() {
         initializeStream();
 
-        logger.info("starting couchdb stream: url [{}], database [{}], indexing to [{}]/[{}]",
-                connectionConfig.getUrl(), databaseConfig.getDatabase(), indexConfig.getName(), indexConfig.getType());
-        try {
-            client.admin().indices().prepareCreate(indexConfig.getName()).execute().actionGet();
-        } catch (Exception e) {
-            if (ExceptionsHelper.unwrapCause(e) instanceof IndexAlreadyExistsException) {
-                // that's fine
-            } else if (ExceptionsHelper.unwrapCause(e) instanceof ClusterBlockException) {
-                // ok, not recovered yet..., lets start indexing and hope we recover by the first bulk
-                // TODO: a smarter logic can be to register for cluster event listener here, and only start sampling when the block is removed...
-            } else {
-                logger.warn("failed to create index [{}], disabling river...", e, indexConfig.getName());
-                return;
-            }
-        }
+        initializeIndex();
 
         ThreadFactory slurperFactory = daemonThreadFactory(settings.globalSettings(), "couchdb_river_slurper");
         ThreadFactory indexerFactory = daemonThreadFactory(settings.globalSettings(), "couchdb_river_indexer");
@@ -114,6 +102,31 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
 
         for (Thread thread : threads) {
             thread.start();
+        }
+    }
+
+    private void initializeIndex() {
+        logger.info("starting couchdb stream: url [{}], database [{}], indexing to [{}]/[{}]",
+                connectionConfig.getUrl(), databaseConfig.getDatabase(), indexConfig.getName(), indexConfig.getType());
+        int maxAttempts = 10;
+        for (int i = 1; i <= maxAttempts; ++i) {
+            logger.info("Preparing index=[{}], attempt #{}.", indexConfig.getName(), i);
+            try {
+                client.admin().indices().prepareCreate(indexConfig.getName()).execute().actionGet();
+                return;
+            } catch (Exception e) {
+                Throwable cause = unwrapCause(e);
+                if (cause instanceof IndexAlreadyExistsException) {
+                    logger.info("Index=[{}] already exists. No need to create one.", indexConfig.getName());
+                    return;
+                } else if (cause instanceof ClusterBlockException) {
+                    logger.warn("Cluster not recovered yet. Retrying...");
+                    sleepLong("to give the cluster some time to recover.");
+                } else {
+                    logger.warn("failed to create index [{}], disabling river...", e, indexConfig.getName());
+                    propagate(e);
+                }
+            }
         }
     }
 
