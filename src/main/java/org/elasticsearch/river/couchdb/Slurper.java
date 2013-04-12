@@ -2,8 +2,6 @@ package org.elasticsearch.river.couchdb;
 
 import static org.elasticsearch.common.base.Joiner.on;
 import static org.elasticsearch.river.couchdb.util.Sleeper.sleepLong;
-import org.elasticsearch.action.get.GetResponse;
-import org.elasticsearch.client.Client;
 import org.elasticsearch.common.io.Closeables;
 import org.elasticsearch.common.logging.ESLogger;
 import org.elasticsearch.common.logging.Loggers;
@@ -17,7 +15,6 @@ import java.io.UnsupportedEncodingException;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
-import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 
 public class Slurper implements Runnable {
@@ -26,22 +23,19 @@ public class Slurper implements Runnable {
 
     private final CouchdbConnectionConfig connectionConfig;
     private final CouchdbDatabaseConfig databaseConfig;
-    private final RiverConfig riverConfig;
-
-    private final Client client;
+    private final LastSeqReader lastSeqReader;
     private final BlockingQueue<String> stream;
 
     private volatile boolean closed;
 
     public Slurper(CouchdbConnectionConfig connectionConfig, CouchdbDatabaseConfig databaseConfig,
-                   RiverConfig riverConfig, Client client, BlockingQueue<String> stream) {
+                   LastSeqReader lastSeqReader, BlockingQueue<String> stream) {
         this.connectionConfig = connectionConfig;
         this.databaseConfig = databaseConfig;
-        this.client = client;
+        this.lastSeqReader = lastSeqReader;
         this.stream = stream;
-        this.riverConfig = riverConfig;
 
-        logger = Loggers.getLogger(Slurper.class, riverConfig.getRiverSettings().globalSettings(), name());
+        logger = Loggers.getLogger(Slurper.class, name());
     }
 
     private String name() {
@@ -62,7 +56,7 @@ public class Slurper implements Runnable {
     }
 
     private void slurp() {
-        String lastSeq = readLastSequenceFromIndex();
+        String lastSeq = lastSeqReader.readLastSequenceFromIndex();
 
         String file = "/" + databaseConfig.getDatabase() + "/_changes?feed=continuous&include_docs=true&heartbeat=10000";
         if (databaseConfig.shouldUseFilter()) {
@@ -156,24 +150,6 @@ public class Slurper implements Runnable {
                 }
             }
         }
-    }
-
-    private String readLastSequenceFromIndex() {
-        client.admin().indices().prepareRefresh(riverConfig.getRiverIndexName()).execute().actionGet();
-
-        GetResponse lastSeqResponse = client.prepareGet(riverConfig.getRiverIndexName(),
-                riverConfig.getRiverName().name(), "_seq").execute().actionGet();
-
-        if (lastSeqResponse.isExists()) {
-            return parseLastSeq(lastSeqResponse);
-        }
-        return null;
-    }
-
-    private String parseLastSeq(GetResponse lastSeqResponse) {
-        @SuppressWarnings("unchecked")
-        Map<String, Object> db = (Map) lastSeqResponse.getSourceAsMap().get(databaseConfig.getDatabase());
-        return db == null ? null : (String) db.get("last_seq");
     }
 
     public void close() {

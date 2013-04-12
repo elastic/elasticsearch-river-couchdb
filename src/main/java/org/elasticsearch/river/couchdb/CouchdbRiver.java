@@ -93,7 +93,8 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
         ThreadFactory slurperFactory = daemonThreadFactory(settings.globalSettings(), "couchdb_river_slurper");
         ThreadFactory indexerFactory = daemonThreadFactory(settings.globalSettings(), "couchdb_river_indexer");
 
-        slurper = new Slurper(connectionConfig, databaseConfig, riverConfig, client, stream);
+        LastSeqReader lastSeqReader = new LastSeqReader(databaseConfig, riverConfig, client);
+        slurper = new Slurper(connectionConfig, databaseConfig, lastSeqReader, stream);
         threads.add(slurperFactory.newThread(slurper));
         threads.add(indexerFactory.newThread(new Indexer()));
 
