@@ -26,8 +26,8 @@ public class Slurper implements Runnable {
     private final CouchdbDatabaseConfig databaseConfig;
     private final LastSeqReader lastSeqReader;
     private final BlockingQueue<String> stream;
-
     private final UrlBuilder changesFeedUrlBuilder;
+
     private volatile boolean closed;
 
     public Slurper(CouchdbConnectionConfig connectionConfig, CouchdbDatabaseConfig databaseConfig,
@@ -66,17 +66,18 @@ public class Slurper implements Runnable {
         logger.info("Read {}=[{}] from index.", LAST_SEQ, lastSeq);
         changesFeedUrlBuilder.withLastSeq(lastSeq);
 
+        URL changesFeedUrl = changesFeedUrlBuilder.build();
+        logger.debug("Will use changes' feed URL=[{}].", changesFeedUrl);
+
+        listenForChanges(changesFeedUrl);
+    }
+
+    private void listenForChanges(URL changesFeedUrl) throws InterruptedException {
         HttpURLConnection connection = null;
         BufferedReader reader = null;
         try {
-            URL url = changesFeedUrlBuilder.build();
-            logger.debug("Will use changes' feed URL=[{}].", url);
-
-            connection = configureConnection(url);
-
-            boolean successfullyConnected = connect(connection);
-            InputStream is = successfullyConnected ? connection.getInputStream() : connection.getErrorStream();
-            reader = bufferedUtf8ReaderFor(is);
+            connection = configureConnection(changesFeedUrl);
+            reader = bufferedUtf8ReaderFor(connectAndExtractReader(connection));
 
             blockingReadFromConnection(reader);
 
@@ -112,9 +113,11 @@ public class Slurper implements Runnable {
         return connection;
     }
 
-    private boolean connect(HttpURLConnection connection) throws IOException {
+    private InputStream connectAndExtractReader(HttpURLConnection connection) throws IOException {
         connection.connect();
-        return connection.getResponseCode() / 100 == 2;
+
+        boolean successfullyConnected = connection.getResponseCode() / 100 == 2;
+        return successfullyConnected ? connection.getInputStream() : connection.getErrorStream();
     }
 
     private void blockingReadFromConnection(BufferedReader reader) throws IOException, InterruptedException {
