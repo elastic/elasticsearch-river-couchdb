@@ -3,6 +3,7 @@ package org.elasticsearch.river.couchdb;
 import static org.elasticsearch.river.couchdb.LastSeqReader.LAST_SEQ;
 import static org.elasticsearch.river.couchdb.util.LoggerHelper.slurperLogger;
 import static org.elasticsearch.river.couchdb.util.Sleeper.sleepLong;
+import org.elasticsearch.common.annotations.VisibleForTesting;
 import org.elasticsearch.common.base.Optional;
 import org.elasticsearch.common.logging.ESLogger;
 import java.net.URL;
@@ -41,7 +42,8 @@ public class Slurper implements Runnable {
         logger.info("Closed.");
     }
 
-    private void slurp() throws InterruptedException {
+    @VisibleForTesting
+    void slurp() throws InterruptedException {
         Optional<String> lastSeq = lastSeqReader.readLastSequenceFromIndex();
         logger.info("Read {}=[{}] from index.", LAST_SEQ, lastSeq);
         changesFeedUrlBuilder.withLastSeq(lastSeq);
