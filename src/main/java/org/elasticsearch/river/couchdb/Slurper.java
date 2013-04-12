@@ -12,10 +12,8 @@ import javax.net.ssl.SSLSession;
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.io.UnsupportedEncodingException;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.net.URLEncoder;
 import java.util.concurrent.BlockingQueue;
 
 public class Slurper implements Runnable {
@@ -27,6 +25,7 @@ public class Slurper implements Runnable {
     private final LastSeqReader lastSeqReader;
     private final BlockingQueue<String> stream;
 
+    private final UrlBuilder changesFeedUrlBuilder;
     private volatile boolean closed;
 
     public Slurper(CouchdbConnectionConfig connectionConfig, CouchdbDatabaseConfig databaseConfig,
@@ -37,6 +36,8 @@ public class Slurper implements Runnable {
         this.stream = stream;
 
         logger = Loggers.getLogger(Slurper.class, name());
+
+        changesFeedUrlBuilder = new UrlBuilder(connectionConfig, databaseConfig);
     }
 
     private String name() {
@@ -58,29 +59,17 @@ public class Slurper implements Runnable {
 
     private void slurp() {
         Optional<String> lastSeq = lastSeqReader.readLastSequenceFromIndex();
-
-        String file = "/" + databaseConfig.getDatabase() + "/_changes?feed=continuous&include_docs=true&heartbeat=10000";
-        if (databaseConfig.shouldUseFilter()) {
-            file += databaseConfig.buildFilterUrlParams();
-        }
-
-        if (lastSeq.isPresent()) {
-            try {
-                file = file + "&since=" + URLEncoder.encode(lastSeq.get(), "UTF-8");
-            } catch (UnsupportedEncodingException e) {
-                // should not happen, but in any case...
-                file = file + "&since=" + lastSeq;
-            }
-        }
-
-        if (logger.isDebugEnabled()) {
-            logger.debug("using url [{}], path [{}]", connectionConfig.getUrl(), file);
-        }
+        changesFeedUrlBuilder.withLastSeq(lastSeq);
 
         HttpURLConnection connection = null;
         InputStream is = null;
         try {
-            URL url = new URL(connectionConfig.getUrl(), file);
+            URL url = changesFeedUrlBuilder.build();
+
+            if (logger.isDebugEnabled()) {
+                logger.debug("Using CouchDB changes' feed URL=[{}].", url);
+            }
+
             connection = (HttpURLConnection) url.openConnection();
 
             if (connectionConfig.requiresAuthentication()) {
