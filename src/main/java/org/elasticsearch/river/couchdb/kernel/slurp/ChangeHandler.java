@@ -1,4 +1,4 @@
-package org.elasticsearch.river.couchdb;
+package org.elasticsearch.river.couchdb.kernel.slurp;
 
 import static org.elasticsearch.river.couchdb.util.LoggerHelper.slurperLogger;
 import org.elasticsearch.common.logging.ESLogger;

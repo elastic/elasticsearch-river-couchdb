@@ -2,7 +2,7 @@ package org.elasticsearch.river.couchdb.util;
 
 import org.elasticsearch.common.logging.ESLogger;
 import org.elasticsearch.common.logging.Loggers;
-import org.elasticsearch.river.couchdb.Slurper;
+import org.elasticsearch.river.couchdb.kernel.slurp.Slurper;
 
 public class LoggerHelper {
 

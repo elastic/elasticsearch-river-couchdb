@@ -1,10 +1,11 @@
-package org.elasticsearch.river.couchdb;
+package org.elasticsearch.river.couchdb.kernel.slurp;
 
 import static org.elasticsearch.common.base.Throwables.propagate;
 import static org.elasticsearch.river.couchdb.util.Helpers.bufferedUtf8ReaderFor;
 import static org.elasticsearch.river.couchdb.util.Helpers.closeQuietly;
 import static org.elasticsearch.river.couchdb.util.LoggerHelper.slurperLogger;
 import org.elasticsearch.common.logging.ESLogger;
+import org.elasticsearch.river.couchdb.CouchdbConnectionConfig;
 import javax.net.ssl.HostnameVerifier;
 import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.SSLSession;

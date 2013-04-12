@@ -1,12 +1,15 @@
-package org.elasticsearch.river.couchdb;
+package org.elasticsearch.river.couchdb.kernel.slurp;
 
 import static org.elasticsearch.common.collect.Maps.newHashMap;
-import static org.elasticsearch.river.couchdb.LastSeqReader.LAST_SEQ;
+import static org.elasticsearch.river.couchdb.kernel.slurp.LastSeqReader.LAST_SEQ;
 import static org.fest.assertions.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
 import org.elasticsearch.action.get.GetResponse;
 import org.elasticsearch.client.Client;
 import org.elasticsearch.common.base.Optional;
+import org.elasticsearch.river.couchdb.CouchdbDatabaseConfig;
+import org.elasticsearch.river.couchdb.RiverConfig;
+import org.elasticsearch.river.couchdb.kernel.slurp.LastSeqReader;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;

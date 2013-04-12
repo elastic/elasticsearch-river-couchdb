@@ -1,6 +1,7 @@
-package org.elasticsearch.river.couchdb;
+package org.elasticsearch.river.couchdb.kernel.slurp;
 
 import static org.mockito.Mockito.verify;
+import org.elasticsearch.river.couchdb.kernel.slurp.ChangeHandler;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.InjectMocks;

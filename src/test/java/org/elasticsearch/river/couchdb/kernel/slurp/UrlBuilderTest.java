@@ -1,8 +1,11 @@
-package org.elasticsearch.river.couchdb;
+package org.elasticsearch.river.couchdb.kernel.slurp;
 
 import static org.fest.assertions.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
 import org.elasticsearch.common.base.Optional;
+import org.elasticsearch.river.couchdb.CouchdbConnectionConfig;
+import org.elasticsearch.river.couchdb.CouchdbDatabaseConfig;
+import org.elasticsearch.river.couchdb.kernel.slurp.UrlBuilder;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.InjectMocks;

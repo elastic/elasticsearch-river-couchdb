@@ -1,4 +1,4 @@
-package org.elasticsearch.river.couchdb;
+package org.elasticsearch.river.couchdb.kernel.slurp;
 
 import static org.elasticsearch.common.base.Optional.absent;
 import static org.elasticsearch.common.base.Optional.fromNullable;
@@ -8,6 +8,8 @@ import org.elasticsearch.client.Client;
 import org.elasticsearch.common.annotations.VisibleForTesting;
 import org.elasticsearch.common.base.Optional;
 import org.elasticsearch.common.logging.ESLogger;
+import org.elasticsearch.river.couchdb.CouchdbDatabaseConfig;
+import org.elasticsearch.river.couchdb.RiverConfig;
 import java.util.Map;
 
 public class LastSeqReader {
