@@ -1,49 +1,29 @@
 package org.elasticsearch.river.couchdb;
 
-import static org.elasticsearch.common.base.Throwables.propagate;
 import static org.elasticsearch.river.couchdb.LastSeqReader.LAST_SEQ;
-import static org.elasticsearch.river.couchdb.util.Helpers.bufferedUtf8ReaderFor;
-import static org.elasticsearch.river.couchdb.util.Helpers.closeQuietly;
+import static org.elasticsearch.river.couchdb.util.LoggerHelper.slurperLogger;
 import static org.elasticsearch.river.couchdb.util.Sleeper.sleepLong;
 import org.elasticsearch.common.base.Optional;
 import org.elasticsearch.common.logging.ESLogger;
-import org.elasticsearch.common.logging.Loggers;
-import javax.net.ssl.HostnameVerifier;
-import javax.net.ssl.HttpsURLConnection;
-import javax.net.ssl.SSLSession;
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.net.HttpURLConnection;
 import java.net.URL;
-import java.util.concurrent.BlockingQueue;
 
 public class Slurper implements Runnable {
 
     private final ESLogger logger;
 
-    private final CouchdbConnectionConfig connectionConfig;
-    private final CouchdbDatabaseConfig databaseConfig;
     private final LastSeqReader lastSeqReader;
-    private final BlockingQueue<String> stream;
     private final UrlBuilder changesFeedUrlBuilder;
+    private final CouchdbHttpClient couchdbHttpClient;
 
     private volatile boolean closed;
 
-    public Slurper(CouchdbConnectionConfig connectionConfig, CouchdbDatabaseConfig databaseConfig,
-                   LastSeqReader lastSeqReader, BlockingQueue<String> stream) {
-        this.connectionConfig = connectionConfig;
-        this.databaseConfig = databaseConfig;
+    public Slurper(String database, LastSeqReader lastSeqReader, UrlBuilder changesFeedUrlBuilder,
+                   CouchdbHttpClient couchdbHttpClient) {
         this.lastSeqReader = lastSeqReader;
-        this.stream = stream;
+        this.changesFeedUrlBuilder = changesFeedUrlBuilder;
+        this.couchdbHttpClient = couchdbHttpClient;
 
-        logger = Loggers.getLogger(Slurper.class, name());
-
-        changesFeedUrlBuilder = new UrlBuilder(connectionConfig, databaseConfig);
-    }
-
-    private String name() {
-        return String.format("%s for database=[%s]", getClass().getSimpleName(), databaseConfig.getDatabase());
+        logger = slurperLogger(Slurper.class, database);
     }
 
     @Override
@@ -69,68 +49,7 @@ public class Slurper implements Runnable {
         URL changesFeedUrl = changesFeedUrlBuilder.build();
         logger.debug("Will use changes' feed URL=[{}].", changesFeedUrl);
 
-        listenForChanges(changesFeedUrl);
-    }
-
-    private void listenForChanges(URL changesFeedUrl) throws InterruptedException {
-        HttpURLConnection connection = null;
-        BufferedReader reader = null;
-        try {
-            connection = configureConnection(changesFeedUrl);
-            reader = bufferedUtf8ReaderFor(connectAndExtractReader(connection));
-
-            blockingReadFromConnection(reader);
-
-        } catch (InterruptedException ie) {
-            throw ie;
-        } catch (Exception e) {
-            logger.warn("Error occurred when polling for CouchDb changes.");
-            throw propagate(e);
-        } finally {
-            closeQuietly(connection, reader);
-        }
-    }
-
-    private HttpURLConnection configureConnection(URL url) throws IOException {
-        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-
-        if (connectionConfig.requiresAuthentication()) {
-            connection.addRequestProperty("Authorization", connectionConfig.getBasicAuthHeader());
-        }
-
-        connection.setDoInput(true);
-        connection.setUseCaches(false);
-
-        if (!connectionConfig.shouldVerifyHostname()) {
-            ((HttpsURLConnection) connection).setHostnameVerifier(
-                    new HostnameVerifier() {
-                        public boolean verify(String string, SSLSession ssls) {
-                            return true;
-                        }
-                    }
-            );
-        }
-        return connection;
-    }
-
-    private InputStream connectAndExtractReader(HttpURLConnection connection) throws IOException {
-        connection.connect();
-
-        boolean successfullyConnected = connection.getResponseCode() / 100 == 2;
-        return successfullyConnected ? connection.getInputStream() : connection.getErrorStream();
-    }
-
-    private void blockingReadFromConnection(BufferedReader reader) throws IOException, InterruptedException {
-        String line;
-        while ((line = reader.readLine()) != null) {
-            if (line.isEmpty()) {
-                logger.trace("Received a heartbeat from CouchDB.");
-                continue;
-            }
-            logger.trace("Received an update=[{}].", line);
-
-            stream.put(line);
-        }
+        couchdbHttpClient.listenForChanges(changesFeedUrl);
     }
 
     public void close() {
