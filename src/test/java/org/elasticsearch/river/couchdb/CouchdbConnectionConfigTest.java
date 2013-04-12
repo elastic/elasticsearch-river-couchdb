@@ -2,7 +2,7 @@ package org.elasticsearch.river.couchdb;
 
 import static org.elasticsearch.common.collect.Maps.newHashMap;
 import static org.elasticsearch.river.couchdb.CouchdbConnectionConfig.*;
-import static org.elasticsearch.river.couchdb.Helpers.asUrl;
+import static org.elasticsearch.river.couchdb.util.Helpers.asUrl;
 import static org.fest.assertions.api.Assertions.assertThat;
 import org.elasticsearch.river.RiverSettings;
 import org.junit.Test;

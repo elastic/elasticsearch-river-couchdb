@@ -3,7 +3,7 @@ package org.elasticsearch.river.couchdb;
 import static org.elasticsearch.common.collect.Maps.newHashMap;
 import static org.elasticsearch.common.xcontent.support.XContentMapValues.nodeBooleanValue;
 import static org.elasticsearch.common.xcontent.support.XContentMapValues.nodeStringValue;
-import static org.elasticsearch.river.couchdb.Helpers.asUrlParam;
+import static org.elasticsearch.river.couchdb.util.Helpers.asUrlParam;
 import java.util.Map;
 import org.elasticsearch.river.RiverSettings;
 import org.elasticsearch.script.ExecutableScript;

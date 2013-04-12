@@ -1,4 +1,4 @@
-package org.elasticsearch.river.couchdb;
+package org.elasticsearch.river.couchdb.util;
 
 import static org.elasticsearch.common.base.Joiner.on;
 import static org.elasticsearch.common.base.Throwables.propagate;
