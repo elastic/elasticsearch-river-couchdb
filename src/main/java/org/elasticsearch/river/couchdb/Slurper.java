@@ -1,17 +1,19 @@
 package org.elasticsearch.river.couchdb;
 
 import static org.elasticsearch.common.base.Joiner.on;
+import static org.elasticsearch.common.base.Throwables.propagate;
+import static org.elasticsearch.river.couchdb.util.Helpers.bufferedUtf8ReaderFor;
+import static org.elasticsearch.river.couchdb.util.Helpers.closeQuietly;
 import static org.elasticsearch.river.couchdb.util.Sleeper.sleepLong;
 import org.elasticsearch.common.base.Optional;
-import org.elasticsearch.common.io.Closeables;
 import org.elasticsearch.common.logging.ESLogger;
 import org.elasticsearch.common.logging.Loggers;
 import javax.net.ssl.HostnameVerifier;
 import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.SSLSession;
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.concurrent.BlockingQueue;
@@ -49,6 +51,8 @@ public class Slurper implements Runnable {
         while (!closed) {
             try {
                 slurp();
+            } catch (InterruptedException ie) {
+                break;
             } catch (Exception e) {
                 logger.warn("Slurper error for database=[{}].", e, databaseConfig.getDatabase());
                 sleepLong("to avoid log flooding");
@@ -57,88 +61,71 @@ public class Slurper implements Runnable {
         logger.info("Closing " + name());
     }
 
-    private void slurp() {
+    private void slurp() throws InterruptedException {
         Optional<String> lastSeq = lastSeqReader.readLastSequenceFromIndex();
         changesFeedUrlBuilder.withLastSeq(lastSeq);
 
         HttpURLConnection connection = null;
-        InputStream is = null;
+        BufferedReader reader = null;
         try {
             URL url = changesFeedUrlBuilder.build();
+            logger.debug("Will use changes' feed URL=[{}] for database=[{}].", url, databaseConfig.getDatabase());
 
-            if (logger.isDebugEnabled()) {
-                logger.debug("Using CouchDB changes' feed URL=[{}].", url);
-            }
+            connection = configureConnection(url);
 
-            connection = (HttpURLConnection) url.openConnection();
+            boolean successfullyConnected = connect(connection);
+            InputStream is = successfullyConnected ? connection.getInputStream() : connection.getErrorStream();
+            reader = bufferedUtf8ReaderFor(is);
 
-            if (connectionConfig.requiresAuthentication()) {
-                connection.addRequestProperty("Authorization", connectionConfig.getBasicAuthHeader());
-            }
-            connection.setDoInput(true);
-            connection.setUseCaches(false);
+            blockingReadFromConnection(reader);
 
-            if (!connectionConfig.shouldVerifyHostname()) {
-                ((HttpsURLConnection) connection).setHostnameVerifier(
-                        new HostnameVerifier() {
-                            public boolean verify(String string, SSLSession ssls) {
-                                return true;
-                            }
-                        }
-                );
-            }
-
-            is = connection.getInputStream();
-
-            final BufferedReader reader = new BufferedReader(new InputStreamReader(is, "UTF-8"));
-            String line;
-            while ((line = reader.readLine()) != null) {
-                if (closed) {
-                    return;
-                }
-                if (line.length() == 0) {
-                    logger.trace("[couchdb] heartbeat");
-                    continue;
-                }
-                if (logger.isTraceEnabled()) {
-                    logger.trace("[couchdb] {}", line);
-                }
-                // we put here, so we block if there is no space to add
-                stream.put(line);
-            }
+        } catch (InterruptedException ie) {
+            throw ie;
         } catch (Exception e) {
-            Closeables.closeQuietly(is);
-            if (connection != null) {
-                try {
-                    connection.disconnect();
-                } catch (Exception e1) {
-                    // ignore
-                } finally {
-                    connection = null;
-                }
-            }
-            if (closed) {
-                return;
-            }
-            logger.warn("failed to read from _changes, throttling....", e);
-            try {
-                Thread.sleep(5000);
-            } catch (InterruptedException e1) {
-                if (closed) {
-                    return;
-                }
-            }
+            logger.warn("Error occurred when polling for CouchDb changes for database=[{}].", databaseConfig.getDatabase());
+            throw propagate(e);
         } finally {
-            Closeables.closeQuietly(is);
-            if (connection != null) {
-                try {
-                    connection.disconnect();
-                } catch (Exception e1) {
-                    // ignore
-                } finally {
-                    connection = null;
-                }
+            closeQuietly(connection, reader);
+        }
+    }
+
+    private HttpURLConnection configureConnection(URL url) throws IOException {
+        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+
+        if (connectionConfig.requiresAuthentication()) {
+            connection.addRequestProperty("Authorization", connectionConfig.getBasicAuthHeader());
+        }
+
+        connection.setDoInput(true);
+        connection.setUseCaches(false);
+
+        if (!connectionConfig.shouldVerifyHostname()) {
+            ((HttpsURLConnection) connection).setHostnameVerifier(
+                    new HostnameVerifier() {
+                        public boolean verify(String string, SSLSession ssls) {
+                            return true;
+                        }
+                    }
+            );
+        }
+        return connection;
+    }
+
+    private boolean connect(HttpURLConnection connection) throws IOException {
+        connection.connect();
+        return connection.getResponseCode() / 100 == 2;
+    }
+
+    private void blockingReadFromConnection(BufferedReader reader) throws IOException, InterruptedException {
+        String line;
+        while ((line = reader.readLine()) != null) {
+            if (line.isEmpty()) {
+                logger.trace("Received a heartbeat from CouchDB.");
+                continue;
             }
+            logger.trace("Received an update=[{}].", line);
+
+            stream.put(line);
         }
     }
 
