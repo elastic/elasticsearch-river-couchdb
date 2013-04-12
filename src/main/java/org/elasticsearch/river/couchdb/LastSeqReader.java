@@ -1,7 +1,11 @@
 package org.elasticsearch.river.couchdb;
 
+import static org.elasticsearch.common.base.Optional.absent;
+import static org.elasticsearch.common.base.Optional.fromNullable;
 import org.elasticsearch.action.get.GetResponse;
 import org.elasticsearch.client.Client;
+import org.elasticsearch.common.annotations.VisibleForTesting;
+import org.elasticsearch.common.base.Optional;
 import java.util.Map;
 
 public class LastSeqReader {
@@ -19,16 +23,26 @@ public class LastSeqReader {
         this.client = client;
     }
 
-    public String readLastSequenceFromIndex() {
-        client.admin().indices().prepareRefresh(riverConfig.getRiverIndexName()).execute().actionGet();
+    public Optional<String> readLastSequenceFromIndex() {
+        refreshIndex();
 
-        GetResponse lastSeqResponse = client.prepareGet(riverConfig.getRiverIndexName(),
-                riverConfig.getRiverName().name(), "_seq").execute().actionGet();
+        GetResponse lastSeqResponse = doReadLastSeq();
 
         if (lastSeqResponse.isExists()) {
-            return parseLastSeq(lastSeqResponse);
+            return fromNullable(parseLastSeq(lastSeqResponse));
         }
-        return null;
+        return absent();
+    }
+
+    @VisibleForTesting
+    void refreshIndex() {
+        client.admin().indices().prepareRefresh(riverConfig.getRiverIndexName()).execute().actionGet();
+    }
+
+    @VisibleForTesting
+    GetResponse doReadLastSeq() {
+        return client.prepareGet(riverConfig.getRiverIndexName(),
+                riverConfig.getRiverName().name(), "_seq").execute().actionGet();
     }
 
     private String parseLastSeq(GetResponse lastSeqResponse) {

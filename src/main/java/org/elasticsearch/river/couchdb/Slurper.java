@@ -2,6 +2,7 @@ package org.elasticsearch.river.couchdb;
 
 import static org.elasticsearch.common.base.Joiner.on;
 import static org.elasticsearch.river.couchdb.util.Sleeper.sleepLong;
+import org.elasticsearch.common.base.Optional;
 import org.elasticsearch.common.io.Closeables;
 import org.elasticsearch.common.logging.ESLogger;
 import org.elasticsearch.common.logging.Loggers;
@@ -56,16 +57,16 @@ public class Slurper implements Runnable {
     }
 
     private void slurp() {
-        String lastSeq = lastSeqReader.readLastSequenceFromIndex();
+        Optional<String> lastSeq = lastSeqReader.readLastSequenceFromIndex();
 
         String file = "/" + databaseConfig.getDatabase() + "/_changes?feed=continuous&include_docs=true&heartbeat=10000";
         if (databaseConfig.shouldUseFilter()) {
             file += databaseConfig.buildFilterUrlParams();
         }
 
-        if (lastSeq != null) {
+        if (lastSeq.isPresent()) {
             try {
-                file = file + "&since=" + URLEncoder.encode(lastSeq, "UTF-8");
+                file = file + "&since=" + URLEncoder.encode(lastSeq.get(), "UTF-8");
             } catch (UnsupportedEncodingException e) {
                 // should not happen, but in any case...
                 file = file + "&since=" + lastSeq;
