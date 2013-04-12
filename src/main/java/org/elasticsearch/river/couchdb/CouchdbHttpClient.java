@@ -41,8 +41,8 @@ public class CouchdbHttpClient {
         } catch (InterruptedException ie) {
             throw ie;
         } catch (Exception e) {
-            logger.warn("Error occurred when polling for CouchDB changes.");
-            throw propagate(e);
+            logger.warn("Error occurred when listening for CouchDB changes.");
+            propagate(e);
         } finally {
             closeQuietly(connection, reader);
         }

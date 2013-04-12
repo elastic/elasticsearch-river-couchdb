@@ -33,7 +33,7 @@ public class Slurper implements Runnable {
             try {
                 slurp();
             } catch (InterruptedException ie) {
-                break;
+                close();
             } catch (Exception e) {
                 logger.warn("Unhandled error, throttling.", e);
                 sleepLong("to avoid log flooding");
