@@ -1,7 +1,7 @@
 package org.elasticsearch.river.couchdb;
 
-import static org.elasticsearch.common.base.Joiner.on;
 import static org.elasticsearch.common.base.Throwables.propagate;
+import static org.elasticsearch.river.couchdb.LastSeqReader.LAST_SEQ;
 import static org.elasticsearch.river.couchdb.util.Helpers.bufferedUtf8ReaderFor;
 import static org.elasticsearch.river.couchdb.util.Helpers.closeQuietly;
 import static org.elasticsearch.river.couchdb.util.Sleeper.sleepLong;
@@ -43,7 +43,7 @@ public class Slurper implements Runnable {
     }
 
     private String name() {
-        return on(":").join(getClass().getSimpleName(), databaseConfig.getDatabase());
+        return String.format("%s for database=[%s]", getClass().getSimpleName(), databaseConfig.getDatabase());
     }
 
     @Override
@@ -54,22 +54,23 @@ public class Slurper implements Runnable {
             } catch (InterruptedException ie) {
                 break;
             } catch (Exception e) {
-                logger.warn("Slurper error for database=[{}].", e, databaseConfig.getDatabase());
+                logger.warn("Unhandled error, throttling.", e);
                 sleepLong("to avoid log flooding");
             }
         }
-        logger.info("Closing " + name());
+        logger.info("Closed.");
     }
 
     private void slurp() throws InterruptedException {
         Optional<String> lastSeq = lastSeqReader.readLastSequenceFromIndex();
+        logger.info("Read {}=[{}] from index.", LAST_SEQ, lastSeq);
         changesFeedUrlBuilder.withLastSeq(lastSeq);
 
         HttpURLConnection connection = null;
         BufferedReader reader = null;
         try {
             URL url = changesFeedUrlBuilder.build();
-            logger.debug("Will use changes' feed URL=[{}] for database=[{}].", url, databaseConfig.getDatabase());
+            logger.debug("Will use changes' feed URL=[{}].", url);
 
             connection = configureConnection(url);
 
@@ -82,7 +83,7 @@ public class Slurper implements Runnable {
         } catch (InterruptedException ie) {
             throw ie;
         } catch (Exception e) {
-            logger.warn("Error occurred when polling for CouchDb changes for database=[{}].", databaseConfig.getDatabase());
+            logger.warn("Error occurred when polling for CouchDb changes.");
             throw propagate(e);
         } finally {
             closeQuietly(connection, reader);
