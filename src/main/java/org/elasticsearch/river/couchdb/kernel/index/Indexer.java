@@ -8,6 +8,7 @@ import static org.elasticsearch.river.couchdb.util.LoggerHelper.indexerLogger;
 import static org.elasticsearch.river.couchdb.util.Sleeper.sleepLong;
 import org.elasticsearch.action.bulk.BulkRequestBuilder;
 import org.elasticsearch.action.bulk.BulkResponse;
+import org.elasticsearch.action.index.IndexRequest;
 import org.elasticsearch.client.Client;
 import org.elasticsearch.common.logging.ESLogger;
 import org.elasticsearch.common.xcontent.XContentBuilder;
@@ -25,19 +26,22 @@ import java.util.concurrent.TimeUnit;
 public class Indexer implements Runnable {
 
     public static final String LAST_SEQ = "last_seq";
+
     private final ESLogger logger;
 
+    private final String database;
     private final BlockingQueue<String> changesStream;
     private final Client client;
+
     private ExecutableScript script;
-
     private final IndexConfig indexConfig;
-    private final RiverConfig riverConfig;
 
+    private final RiverConfig riverConfig;
     private volatile boolean closed;
 
     public Indexer(String database, BlockingQueue<String> stream, Client client, ExecutableScript script, IndexConfig indexConfig,
                    RiverConfig riverConfig) {
+        this.database = database;
         this.changesStream = stream;
         this.client = client;
         this.script = script;
@@ -109,8 +113,7 @@ public class Indexer implements Runnable {
                 logger.trace("processing [_seq  ]: [{}]/[{}]/[{}], last_seq [{}]",
                         riverConfig.getRiverIndexName(), riverConfig.getRiverName().name(), "_seq", lastSeqAsString);
             }
-            bulk.add(indexRequest(riverConfig.getRiverIndexName()).type(riverConfig.getRiverName().name()).id("_seq")
-                    .source(lastSeqSource(lastSeqAsString)));
+            bulk.add(aRequestToUpdateLastSeq(lastSeqAsString));
         }
 
         try {
@@ -124,10 +127,19 @@ public class Indexer implements Runnable {
         }
     }
 
-    private XContentBuilder lastSeqSource(String lastSeqAsString) {
+    private IndexRequest aRequestToUpdateLastSeq(String lastSeq) {
+        logger.debug("Will update {} to [{}].", LAST_SEQ, lastSeq);
+
+        return indexRequest(riverConfig.getRiverIndexName())
+                .type(riverConfig.getRiverName().name())
+                .id("_seq")
+                .source(lastSeqSource(lastSeq));
+    }
+
+    private XContentBuilder lastSeqSource(String lastSeq) {
         try {
             return jsonBuilder().startObject()
-                    .startObject("couchdb").field(LAST_SEQ, lastSeqAsString).endObject()
+                    .startObject(database).field(LAST_SEQ, lastSeq).endObject()
                     .endObject();
         } catch (IOException ioe) {
             logger.error("Could not build a valid JSON to carry information about {}.", LAST_SEQ);
