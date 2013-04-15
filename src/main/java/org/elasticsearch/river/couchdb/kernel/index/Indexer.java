@@ -4,6 +4,7 @@ import static org.elasticsearch.client.Requests.deleteRequest;
 import static org.elasticsearch.client.Requests.indexRequest;
 import static org.elasticsearch.common.xcontent.XContentFactory.jsonBuilder;
 import static org.elasticsearch.river.couchdb.util.LoggerHelper.indexerLogger;
+import static org.elasticsearch.river.couchdb.util.Sleeper.sleepLong;
 import org.elasticsearch.action.bulk.BulkRequestBuilder;
 import org.elasticsearch.action.bulk.BulkResponse;
 import org.elasticsearch.client.Client;
@@ -47,82 +48,81 @@ public class Indexer implements Runnable {
     @Override
     public void run() {
         while (!closed) {
-            String s;
             try {
-                s = stream.take();
-            } catch (InterruptedException e) {
-                if (closed) {
-                    return;
-                }
-                continue;
+                index();
+            } catch (InterruptedException ie) {
+                close();
+            } catch (Exception e) {
+                logger.error("Unhandled error.", e);
+                sleepLong("to avoid log flooding");
             }
-            BulkRequestBuilder bulk = client.prepareBulk();
-            Object lastSeq = null;
-            Object lineSeq = processLine(s, bulk);
+        }
+        logger.info("Closed.");
+    }
+
+    private void index() throws InterruptedException {
+        String s = stream.take();
+
+        BulkRequestBuilder bulk = client.prepareBulk();
+        Object lastSeq = null;
+        Object lineSeq = processLine(s, bulk);
+        if (lineSeq != null) {
+            lastSeq = lineSeq;
+        }
+
+        // spin a bit to see if we can get some more changes
+        while ((s = stream.poll(indexConfig.getBulkTimeout().millis(), TimeUnit.MILLISECONDS)) != null) {
+            lineSeq = processLine(s, bulk);
             if (lineSeq != null) {
                 lastSeq = lineSeq;
             }
 
-            // spin a bit to see if we can get some more changes
-            try {
-                while ((s = stream.poll(indexConfig.getBulkTimeout().millis(), TimeUnit.MILLISECONDS)) != null) {
-                    lineSeq = processLine(s, bulk);
-                    if (lineSeq != null) {
-                        lastSeq = lineSeq;
-                    }
-
-                    if (bulk.numberOfActions() >= indexConfig.getBulkSize()) {
-                        break;
-                    }
-                }
-            } catch (InterruptedException e) {
-                if (closed) {
-                    return;
-                }
+            if (bulk.numberOfActions() >= indexConfig.getBulkSize()) {
+                break;
             }
+        }
 
-            if (lastSeq != null) {
-                try {
-                    // we always store it as a string
-                    String lastSeqAsString = null;
-                    if (lastSeq instanceof List) {
-                        // bigcouch uses array for the seq
-                        try {
-                            XContentBuilder builder = XContentFactory.jsonBuilder();
-                            //builder.startObject();
-                            builder.startArray();
-                            for (Object value : ((List) lastSeq)) {
-                                builder.value(value);
-                            }
-                            builder.endArray();
-                            //builder.endObject();
-                            lastSeqAsString = builder.string();
-                        } catch (Exception e) {
-                            logger.error("failed to convert last_seq to a json string", e);
+        if (lastSeq != null) {
+            try {
+                // we always store it as a string
+                String lastSeqAsString = null;
+                if (lastSeq instanceof List) {
+                    // bigcouch uses array for the seq
+                    try {
+                        XContentBuilder builder = XContentFactory.jsonBuilder();
+                        //builder.startObject();
+                        builder.startArray();
+                        for (Object value : ((List) lastSeq)) {
+                            builder.value(value);
                         }
-                    } else {
-                        lastSeqAsString = lastSeq.toString();
+                        builder.endArray();
+                        //builder.endObject();
+                        lastSeqAsString = builder.string();
+                    } catch (Exception e) {
+                        logger.error("failed to convert last_seq to a json string", e);
                     }
-                    if (logger.isTraceEnabled()) {
-                        logger.trace("processing [_seq  ]: [{}]/[{}]/[{}], last_seq [{}]",
-                                riverConfig.getRiverIndexName(), riverConfig.getRiverName().name(), "_seq", lastSeqAsString);
-                    }
-                    bulk.add(indexRequest(riverConfig.getRiverIndexName()).type(riverConfig.getRiverName().name()).id("_seq")
-                            .source(jsonBuilder().startObject().startObject("couchdb").field("last_seq", lastSeqAsString).endObject().endObject()));
-                } catch (IOException e) {
-                    logger.warn("failed to add last_seq entry to bulk indexing");
+                } else {
+                    lastSeqAsString = lastSeq.toString();
                 }
+                if (logger.isTraceEnabled()) {
+                    logger.trace("processing [_seq  ]: [{}]/[{}]/[{}], last_seq [{}]",
+                            riverConfig.getRiverIndexName(), riverConfig.getRiverName().name(), "_seq", lastSeqAsString);
+                }
+                bulk.add(indexRequest(riverConfig.getRiverIndexName()).type(riverConfig.getRiverName().name()).id("_seq")
+                        .source(jsonBuilder().startObject().startObject("couchdb").field("last_seq", lastSeqAsString).endObject().endObject()));
+            } catch (IOException e) {
+                logger.warn("failed to add last_seq entry to bulk indexing");
             }
+        }
 
-            try {
-                BulkResponse response = bulk.execute().actionGet();
-                if (response.hasFailures()) {
-                    // TODO write to exception queue?
-                    logger.warn("failed to execute" + response.buildFailureMessage());
-                }
-            } catch (Exception e) {
-                logger.warn("failed to execute bulk", e);
+        try {
+            BulkResponse response = bulk.execute().actionGet();
+            if (response.hasFailures()) {
+                // TODO write to exception queue?
+                logger.warn("failed to execute" + response.buildFailureMessage());
             }
+        } catch (Exception e) {
+            logger.warn("failed to execute bulk", e);
         }
     }
 
