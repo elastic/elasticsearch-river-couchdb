@@ -1,5 +1,6 @@
 package org.elasticsearch.river.couchdb.kernel.index;
 
+import static org.elasticsearch.common.base.Preconditions.checkNotNull;
 import static org.elasticsearch.common.base.Throwables.propagate;
 import static org.elasticsearch.common.xcontent.XContentFactory.jsonBuilder;
 import static org.elasticsearch.river.couchdb.kernel.index.Indexer.LAST_SEQ;
@@ -18,6 +19,7 @@ public class LastSeqFormatter {
     }
 
     public String format(Object lastSeq) {
+        checkNotNull(lastSeq);
         if (lastSeq instanceof List) {
             // BigCouch uses array for the seq. @see https://github.com/elasticsearch/elasticsearch/issues/1478
             try {

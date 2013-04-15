@@ -7,6 +7,7 @@ import static org.elasticsearch.common.base.Throwables.propagate;
 import static org.elasticsearch.common.xcontent.XContentFactory.jsonBuilder;
 import static org.elasticsearch.river.couchdb.util.LoggerHelper.indexerLogger;
 import static org.elasticsearch.river.couchdb.util.Sleeper.sleepLong;
+import org.elasticsearch.ElasticSearchException;
 import org.elasticsearch.action.bulk.BulkRequestBuilder;
 import org.elasticsearch.action.bulk.BulkResponse;
 import org.elasticsearch.action.index.IndexRequest;
@@ -61,6 +62,8 @@ public class Indexer implements Runnable {
                 index();
             } catch (InterruptedException ie) {
                 close();
+            } catch (BulkRequestException bre) {
+                logger.warn("Failed to execute bulk request.", bre);
             } catch (Exception e) {
                 logger.error("Unhandled error.", e);
                 sleepLong("to avoid log flooding");
@@ -80,14 +83,19 @@ public class Indexer implements Runnable {
             logger.debug("Will update {} to [{}].", LAST_SEQ, lastSeqAsString);
         }
 
+        if (bulk.numberOfActions() > 0) {
+            executeBulkRequest(bulk);
+        }
+    }
+
+    private void executeBulkRequest(BulkRequestBuilder bulk) {
         try {
             BulkResponse response = bulk.execute().actionGet();
             if (response.hasFailures()) {
-                // TODO write to exception queue?
-                logger.warn("failed to execute" + response.buildFailureMessage());
+                throw new BulkRequestException(response.buildFailureMessage());
             }
-        } catch (Exception e) {
-            logger.warn("failed to execute bulk", e);
+        } catch (ElasticSearchException ese) {
+            throw new BulkRequestException(ese);
         }
     }
 
