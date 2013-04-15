@@ -13,6 +13,7 @@ import org.elasticsearch.common.xcontent.XContentType;
 import org.elasticsearch.river.couchdb.CouchdbDatabaseConfig;
 import org.elasticsearch.river.couchdb.IndexConfig;
 import org.elasticsearch.river.couchdb.RiverConfig;
+import org.elasticsearch.river.couchdb.util.LoggerHelper;
 import org.elasticsearch.script.ExecutableScript;
 import java.io.IOException;
 import java.util.List;
@@ -33,6 +34,10 @@ public class Indexer implements Runnable {
     private ExecutableScript script;
 
     private volatile boolean closed;
+
+    public Indexer() {
+        logger = LoggerHelper.indexerLogger(Indexer.class, databaseConfig.getDatabase());
+    }
 
     @Override
     public void run() {
