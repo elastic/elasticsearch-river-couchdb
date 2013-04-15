@@ -64,6 +64,7 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
     private final ExecutableScript script;
 
     private Slurper slurper;
+    private Indexer indexer;
 
     @Inject
     public CouchdbRiver(RiverName riverName, RiverSettings riverSettings, @RiverIndexName String riverIndexName,
@@ -95,8 +96,10 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
         CouchdbHttpClient couchdbHttpClient = new CouchdbHttpClient(null, connectionConfig, changeHandler);
         slurper = new Slurper(db, lastSeqReader, urlBuilder, couchdbHttpClient);
 
+        indexer = new Indexer(stream, client, indexConfig, databaseConfig, riverConfig);
+
         threads.add(slurperFactory.newThread(slurper));
-        threads.add(indexerFactory.newThread(new Indexer()));
+        threads.add(indexerFactory.newThread(indexer));
 
         for (Thread thread : threads) {
             thread.start();

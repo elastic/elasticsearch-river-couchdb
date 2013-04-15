@@ -23,20 +23,27 @@ import java.util.concurrent.TimeUnit;
 
 public class Indexer implements Runnable {
 
-    private ESLogger logger;
+    private final ESLogger logger;
 
-    private BlockingQueue<String> stream;
-    private Client client;
+    private final BlockingQueue<String> stream;
+    private final Client client;
 
-    private IndexConfig indexConfig;
-    private CouchdbDatabaseConfig databaseConfig;
-    private RiverConfig riverConfig;
+    private final IndexConfig indexConfig;
+    private final CouchdbDatabaseConfig databaseConfig;
+    private final RiverConfig riverConfig;
     private ExecutableScript script;
 
     private volatile boolean closed;
 
-    public Indexer() {
-        logger = LoggerHelper.indexerLogger(Indexer.class, databaseConfig.getDatabase());
+    public Indexer(BlockingQueue<String> stream, Client client, IndexConfig indexConfig,
+                   CouchdbDatabaseConfig databaseConfig, RiverConfig riverConfig) {
+        this.stream = stream;
+        this.client = client;
+        this.indexConfig = indexConfig;
+        this.databaseConfig = databaseConfig;
+        this.riverConfig = riverConfig;
+
+        logger = LoggerHelper.indexerLogger(Indexer.class, this.databaseConfig.getDatabase());
     }
 
     @Override
