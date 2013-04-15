@@ -42,7 +42,6 @@ public class CouchdbDatabaseConfigTest {
 
         // then
         assertThat(cfg.getDatabase()).isEqualTo(testDatabase);
-        assertThat(cfg.shouldIgnoreAttachments()).isFalse();
     }
 
     @Test
@@ -87,7 +86,6 @@ public class CouchdbDatabaseConfigTest {
         // then
         assertThat(cfg.shouldUseScript()).isFalse();
         assertThat(cfg.shouldUseFilter()).isFalse();
-        assertThat(cfg.shouldIgnoreAttachments()).isTrue();
         assertThat(cfg.getDatabase()).isEqualTo(DEFAULT_DATABASE);
     }
 

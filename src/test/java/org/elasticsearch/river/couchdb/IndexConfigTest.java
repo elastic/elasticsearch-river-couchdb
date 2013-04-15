@@ -42,6 +42,7 @@ public class IndexConfigTest {
         assertThat(cfg.getBulkSize()).isEqualTo(testBulkSize);
         assertThat(cfg.getBulkTimeout()).isEqualTo(testBulkTimeout);
         assertThat(cfg.getThrottleSize()).isEqualTo(testThrottleSize);
+        assertThat(cfg.shouldIgnoreAttachments()).isFalse();
     }
 
     @Test
@@ -57,6 +58,7 @@ public class IndexConfigTest {
         assertThat(cfg.getBulkSize()).isEqualTo(DEFAULT_BULK_SIZE);
         assertThat(cfg.getBulkTimeout().millis()).isEqualTo(DEFAULT_BULK_TIMEOUT.millis());
         assertThat(cfg.getThrottleSize()).isEqualTo(DEFAULT_THROTTLE_SIZE);
+        assertThat(cfg.shouldIgnoreAttachments()).isTrue();
     }
 
     private RiverSettings customRiverSettings() {

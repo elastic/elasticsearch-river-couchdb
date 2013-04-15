@@ -2,6 +2,7 @@ package org.elasticsearch.river.couchdb;
 
 import static org.elasticsearch.common.unit.TimeValue.parseTimeValue;
 import static org.elasticsearch.common.unit.TimeValue.timeValueMillis;
+import static org.elasticsearch.common.xcontent.support.XContentMapValues.nodeBooleanValue;
 import static org.elasticsearch.common.xcontent.support.XContentMapValues.nodeIntegerValue;
 import static org.elasticsearch.common.xcontent.support.XContentMapValues.nodeStringValue;
 import org.elasticsearch.common.unit.TimeValue;
@@ -16,6 +17,7 @@ public class IndexConfig {
     public static final String THROTTLE_SIZE = "throttle_size";
     public static final String BULK_TIMEOUT = "bulk_timeout";
     public static final String BULK_SIZE = "bulk_size";
+    public static final String IGNORE_ATTACHMENTS = "ignore_attachments";
 
     static final TimeValue DEFAULT_BULK_TIMEOUT = timeValueMillis(10);
     static final int DEFAULT_BULK_SIZE = 100;
@@ -27,6 +29,7 @@ public class IndexConfig {
     private int bulkSize = DEFAULT_BULK_SIZE;
     private TimeValue bulkTimeout = DEFAULT_BULK_TIMEOUT;
     private int throttleSize = DEFAULT_THROTTLE_SIZE;
+    private boolean ignoreAttachments = true;
 
     public static IndexConfig fromRiverSettings(RiverSettings riverSettings) {
         IndexConfig cfg = new IndexConfig();
@@ -40,6 +43,7 @@ public class IndexConfig {
                 cfg.bulkTimeout = parseTimeValue(nodeStringValue(indexSettings.get(BULK_TIMEOUT), null), DEFAULT_BULK_TIMEOUT);
             }
             cfg.throttleSize = nodeIntegerValue(indexSettings.get(THROTTLE_SIZE), DEFAULT_THROTTLE_SIZE);
+            cfg.ignoreAttachments = nodeBooleanValue(indexSettings.get(IGNORE_ATTACHMENTS));
         }
         return cfg;
     }
@@ -62,5 +66,9 @@ public class IndexConfig {
 
     public int getThrottleSize() {
         return throttleSize;
+    }
+
+    public boolean shouldIgnoreAttachments() {
+        return ignoreAttachments;
     }
 }

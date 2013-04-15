@@ -18,12 +18,10 @@ public class CouchdbDatabaseConfig {
     public static final String FILTER_PARAMS = "filter_params";
     public static final String SCRIPT = "script";
     public static final String SCRIPT_TYPE = "scriptType";
-    public static final String IGNORE_ATTACHMENTS = "ignore_attachments";
 
     static final String DEFAULT_DATABASE = "db";
 
     private String database = DEFAULT_DATABASE;
-    private boolean ignoreAttachments = true;
 
     private String filter;
     private Map<String, String> filterParams;
@@ -45,8 +43,6 @@ public class CouchdbDatabaseConfig {
                 cfg.filterParams = (Map<String, String>) couchSettings.get(FILTER_PARAMS);
             }
 
-            cfg.ignoreAttachments = nodeBooleanValue(couchSettings.get(IGNORE_ATTACHMENTS));
-
             if (couchSettings.containsKey(SCRIPT)) {
                 cfg.script = nodeStringValue(couchSettings.get(SCRIPT), null);
                 cfg.scriptType = nodeStringValue(couchSettings.get(SCRIPT_TYPE), "js");
@@ -57,10 +53,6 @@ public class CouchdbDatabaseConfig {
 
     public String getDatabase() {
         return database;
-    }
-
-    public boolean shouldIgnoreAttachments() {
-        return ignoreAttachments;
     }
     
     public boolean shouldUseFilter() {

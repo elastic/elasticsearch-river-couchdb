@@ -94,7 +94,7 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
 
 
         ExecutableScript script = databaseConfig.getScript(scriptService);
-        indexer = new Indexer(stream, client, script, indexConfig, databaseConfig, riverConfig);
+        indexer = new Indexer(db, stream, client, script, indexConfig, riverConfig);
 
         threads.add(slurperFactory.newThread(slurper));
         threads.add(indexerFactory.newThread(indexer));

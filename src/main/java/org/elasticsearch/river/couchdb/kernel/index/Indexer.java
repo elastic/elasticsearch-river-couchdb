@@ -11,7 +11,6 @@ import org.elasticsearch.common.logging.ESLogger;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.common.xcontent.XContentFactory;
 import org.elasticsearch.common.xcontent.XContentType;
-import org.elasticsearch.river.couchdb.CouchdbDatabaseConfig;
 import org.elasticsearch.river.couchdb.IndexConfig;
 import org.elasticsearch.river.couchdb.RiverConfig;
 import org.elasticsearch.script.ExecutableScript;
@@ -30,21 +29,19 @@ public class Indexer implements Runnable {
     private ExecutableScript script;
 
     private final IndexConfig indexConfig;
-    private final CouchdbDatabaseConfig databaseConfig;
     private final RiverConfig riverConfig;
 
     private volatile boolean closed;
 
-    public Indexer(BlockingQueue<String> stream, Client client, ExecutableScript script, IndexConfig indexConfig,
-                   CouchdbDatabaseConfig databaseConfig, RiverConfig riverConfig) {
+    public Indexer(String database, BlockingQueue<String> stream, Client client, ExecutableScript script, IndexConfig indexConfig,
+                   RiverConfig riverConfig) {
         this.stream = stream;
         this.client = client;
         this.script = script;
         this.indexConfig = indexConfig;
-        this.databaseConfig = databaseConfig;
         this.riverConfig = riverConfig;
 
-        logger = indexerLogger(Indexer.class, this.databaseConfig.getDatabase());
+        logger = indexerLogger(Indexer.class, database);
     }
 
     @Override
@@ -180,7 +177,7 @@ public class Indexer implements Runnable {
             Map<String, Object> doc = (Map<String, Object>) ctx.get("doc");
 
             // Remove _attachment from doc if needed
-            if (databaseConfig.shouldIgnoreAttachments()) {
+            if (indexConfig.shouldIgnoreAttachments()) {
                 // no need to log that we removed it, the doc indexed will be shown without it
                 doc.remove("_attachments");
             } else {
