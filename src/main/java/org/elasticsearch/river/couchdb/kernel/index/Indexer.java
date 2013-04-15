@@ -3,6 +3,7 @@ package org.elasticsearch.river.couchdb.kernel.index;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static org.elasticsearch.client.Requests.deleteRequest;
 import static org.elasticsearch.client.Requests.indexRequest;
+import static org.elasticsearch.common.base.Optional.fromNullable;
 import static org.elasticsearch.common.base.Throwables.propagate;
 import static org.elasticsearch.common.xcontent.XContentFactory.jsonBuilder;
 import static org.elasticsearch.river.couchdb.util.LoggerHelper.indexerLogger;
@@ -13,6 +14,7 @@ import org.elasticsearch.action.bulk.BulkResponse;
 import org.elasticsearch.action.index.IndexRequest;
 import org.elasticsearch.client.Client;
 import org.elasticsearch.common.Nullable;
+import org.elasticsearch.common.base.Optional;
 import org.elasticsearch.common.logging.ESLogger;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.common.xcontent.XContentFactory;
@@ -59,7 +61,10 @@ public class Indexer implements Runnable {
     public void run() {
         while (!closed) {
             try {
-                index();
+                Optional<String> indexedSeq = index();
+                if (indexedSeq.isPresent()) {
+                    logger.debug("Succeeded to index change with seq=[{}].", indexedSeq.get());
+                }
             } catch (InterruptedException ie) {
                 close();
             } catch (BulkRequestException bre) {
@@ -72,20 +77,21 @@ public class Indexer implements Runnable {
         logger.info("Closed.");
     }
 
-    private void index() throws InterruptedException {
+    private Optional<String> index() throws InterruptedException {
         BulkRequestBuilder bulk = client.prepareBulk();
 
-        Object lastSeq = processChanges(bulk);
+        Object rawLastSeq = processChanges(bulk);
+        String lastSeq = lastSeqFormatter.format(rawLastSeq);
 
         if (lastSeq != null) {
-            String lastSeqAsString = lastSeqFormatter.format(lastSeq);
-            bulk.add(aRequestToUpdateLastSeq(lastSeqAsString));
-            logger.debug("Will update {} to [{}].", LAST_SEQ, lastSeqAsString);
+            bulk.add(aRequestToUpdateLastSeq(lastSeq));
+            logger.debug("Will update {} to [{}].", LAST_SEQ, lastSeq);
         }
 
         if (bulk.numberOfActions() > 0) {
             executeBulkRequest(bulk);
         }
+        return fromNullable(lastSeq);
     }
 
     private void executeBulkRequest(BulkRequestBuilder bulk) {

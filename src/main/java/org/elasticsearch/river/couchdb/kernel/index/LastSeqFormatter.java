@@ -1,10 +1,10 @@
 package org.elasticsearch.river.couchdb.kernel.index;
 
-import static org.elasticsearch.common.base.Preconditions.checkNotNull;
 import static org.elasticsearch.common.base.Throwables.propagate;
 import static org.elasticsearch.common.xcontent.XContentFactory.jsonBuilder;
 import static org.elasticsearch.river.couchdb.kernel.index.Indexer.LAST_SEQ;
 import static org.elasticsearch.river.couchdb.util.LoggerHelper.indexerLogger;
+import org.elasticsearch.common.Nullable;
 import org.elasticsearch.common.logging.ESLogger;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 import java.io.IOException;
@@ -18,8 +18,11 @@ public class LastSeqFormatter {
         logger = indexerLogger(LastSeqFormatter.class, database);
     }
 
-    public String format(Object lastSeq) {
-        checkNotNull(lastSeq);
+    @Nullable
+    public String format(@Nullable Object lastSeq) {
+        if (lastSeq == null) {
+            return null;
+        }
         if (lastSeq instanceof List) {
             // BigCouch uses array for the seq. @see https://github.com/elasticsearch/elasticsearch/issues/1478
             try {

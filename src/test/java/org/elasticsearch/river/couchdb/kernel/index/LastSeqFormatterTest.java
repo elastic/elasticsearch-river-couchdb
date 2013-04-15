@@ -10,7 +10,7 @@ public class LastSeqFormatterTest {
     private LastSeqFormatter formatter = new LastSeqFormatter("db");
 
     @Test
-    public void shouldFormatLastSeqWhenItsGivenAsAString() throws Exception {
+    public void shouldFormatLastSeqWhenItsGivenAsAString() {
         // given
         Object lastSeq = "1337";
 
@@ -22,7 +22,7 @@ public class LastSeqFormatterTest {
     }
 
     @Test
-    public void shouldFormatLastSeqWhenItsGivenAsAList() throws Exception {
+    public void shouldFormatLastSeqWhenItsGivenAsAList() {
         // given
         List<?> lastSeq = Arrays.asList(1337, "here goes the hash");
 
@@ -31,5 +31,17 @@ public class LastSeqFormatterTest {
 
         // then
         assertThat(output).isEqualTo("[1337,\"here goes the hash\"]");
+    }
+
+    @Test
+    public void shouldForwardANullLastSeq() {
+        // given
+        Object lastSeq = null;
+
+        // when
+        String output = formatter.format(lastSeq);
+
+        // then
+        assertThat(output).isNull();
     }
 }
