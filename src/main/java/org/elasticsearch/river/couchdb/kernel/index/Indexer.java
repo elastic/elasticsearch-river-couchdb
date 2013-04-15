@@ -1,5 +1,6 @@
 package org.elasticsearch.river.couchdb.kernel.index;
 
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static org.elasticsearch.client.Requests.deleteRequest;
 import static org.elasticsearch.client.Requests.indexRequest;
 import static org.elasticsearch.common.base.Throwables.propagate;
@@ -10,6 +11,7 @@ import org.elasticsearch.action.bulk.BulkRequestBuilder;
 import org.elasticsearch.action.bulk.BulkResponse;
 import org.elasticsearch.action.index.IndexRequest;
 import org.elasticsearch.client.Client;
+import org.elasticsearch.common.Nullable;
 import org.elasticsearch.common.logging.ESLogger;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.common.xcontent.XContentFactory;
@@ -20,7 +22,6 @@ import org.elasticsearch.script.ExecutableScript;
 import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.TimeUnit;
 
 public class Indexer implements Runnable {
 
@@ -69,32 +70,14 @@ public class Indexer implements Runnable {
     }
 
     private void index() throws InterruptedException {
-        String change = changesStream.take();
-
         BulkRequestBuilder bulk = client.prepareBulk();
-        Object lastSeq = null;
-        Object lineSeq = processLine(change, bulk);
-        if (lineSeq != null) {
-            lastSeq = lineSeq;
-        }
 
-        // spin a bit to see if we can get some more changes
-        while ((change = changesStream.poll(indexConfig.getBulkTimeout().millis(), TimeUnit.MILLISECONDS)) != null) {
-            lineSeq = processLine(change, bulk);
-            if (lineSeq != null) {
-                lastSeq = lineSeq;
-            }
-
-            if (bulk.numberOfActions() >= indexConfig.getBulkSize()) {
-                break;
-            }
-        }
+        Object lastSeq = processChanges(bulk);
 
         if (lastSeq != null) {
             String lastSeqAsString = lastSeqFormatter.format(lastSeq);
-
-            logger.debug("Will update {} to [{}].", LAST_SEQ, lastSeqAsString);
             bulk.add(aRequestToUpdateLastSeq(lastSeqAsString));
+            logger.debug("Will update {} to [{}].", LAST_SEQ, lastSeqAsString);
         }
 
         try {
@@ -106,6 +89,30 @@ public class Indexer implements Runnable {
         } catch (Exception e) {
             logger.warn("failed to execute bulk", e);
         }
+    }
+
+    @Nullable
+    private Object processChanges(BulkRequestBuilder bulk) throws InterruptedException {
+        String change = changesStream.take();
+
+        Object lastSeq = null;
+        Object lineSeq = processLine(change, bulk);
+        if (lineSeq != null) {
+            lastSeq = lineSeq;
+        }
+
+        // spin a bit to see if we can get some more changes
+        while ((change = changesStream.poll(indexConfig.getBulkTimeout().millis(), MILLISECONDS)) != null) {
+            lineSeq = processLine(change, bulk);
+            if (lineSeq != null) {
+                lastSeq = lineSeq;
+            }
+
+            if (bulk.numberOfActions() >= indexConfig.getBulkSize()) {
+                break;
+            }
+        }
+        return lastSeq;
     }
 
     private IndexRequest aRequestToUpdateLastSeq(String lastSeq) {
