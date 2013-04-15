@@ -18,7 +18,6 @@ import org.elasticsearch.river.couchdb.IndexConfig;
 import org.elasticsearch.river.couchdb.RiverConfig;
 import org.elasticsearch.script.ExecutableScript;
 import java.io.IOException;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -32,6 +31,7 @@ public class Indexer implements Runnable {
     private final String database;
     private final BlockingQueue<String> changesStream;
     private final Client client;
+    private final LastSeqFormatter lastSeqFormatter;
 
     private ExecutableScript script;
     private final IndexConfig indexConfig;
@@ -39,11 +39,13 @@ public class Indexer implements Runnable {
     private final RiverConfig riverConfig;
     private volatile boolean closed;
 
-    public Indexer(String database, BlockingQueue<String> stream, Client client, ExecutableScript script, IndexConfig indexConfig,
+    public Indexer(String database, BlockingQueue<String> stream, Client client, LastSeqFormatter lastSeqFormatter,
+                   ExecutableScript script, IndexConfig indexConfig,
                    RiverConfig riverConfig) {
         this.database = database;
         this.changesStream = stream;
         this.client = client;
+        this.lastSeqFormatter = lastSeqFormatter;
         this.script = script;
         this.indexConfig = indexConfig;
         this.riverConfig = riverConfig;
@@ -89,7 +91,7 @@ public class Indexer implements Runnable {
         }
 
         if (lastSeq != null) {
-            String lastSeqAsString = standarizeLastSeq(lastSeq);
+            String lastSeqAsString = lastSeqFormatter.format(lastSeq);
 
             logger.debug("Will update {} to [{}].", LAST_SEQ, lastSeqAsString);
             bulk.add(aRequestToUpdateLastSeq(lastSeqAsString));
@@ -103,25 +105,6 @@ public class Indexer implements Runnable {
             }
         } catch (Exception e) {
             logger.warn("failed to execute bulk", e);
-        }
-    }
-
-    private String standarizeLastSeq(Object lastSeq) {
-        if (lastSeq instanceof List) {
-            // bigcouch uses array for the seq
-            try {
-                XContentBuilder builder = jsonBuilder().startArray();
-                for (Object value : ((List) lastSeq)) {
-                    builder.value(value);
-                }
-                builder.endArray();
-                return builder.string();
-            } catch (Exception e) {
-                logger.error("Failed to convert {} to JSON.", LAST_SEQ);
-                throw propagate(e);
-            }
-        } else {
-            return lastSeq.toString();
         }
     }
 
