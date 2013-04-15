@@ -3,6 +3,7 @@ package org.elasticsearch.river.couchdb.kernel.index;
 import static org.elasticsearch.client.Requests.deleteRequest;
 import static org.elasticsearch.client.Requests.indexRequest;
 import static org.elasticsearch.common.xcontent.XContentFactory.jsonBuilder;
+import static org.elasticsearch.river.couchdb.util.LoggerHelper.indexerLogger;
 import org.elasticsearch.action.bulk.BulkRequestBuilder;
 import org.elasticsearch.action.bulk.BulkResponse;
 import org.elasticsearch.client.Client;
@@ -13,7 +14,6 @@ import org.elasticsearch.common.xcontent.XContentType;
 import org.elasticsearch.river.couchdb.CouchdbDatabaseConfig;
 import org.elasticsearch.river.couchdb.IndexConfig;
 import org.elasticsearch.river.couchdb.RiverConfig;
-import org.elasticsearch.river.couchdb.util.LoggerHelper;
 import org.elasticsearch.script.ExecutableScript;
 import java.io.IOException;
 import java.util.List;
@@ -27,31 +27,29 @@ public class Indexer implements Runnable {
 
     private final BlockingQueue<String> stream;
     private final Client client;
+    private ExecutableScript script;
 
     private final IndexConfig indexConfig;
     private final CouchdbDatabaseConfig databaseConfig;
     private final RiverConfig riverConfig;
-    private ExecutableScript script;
 
     private volatile boolean closed;
 
-    public Indexer(BlockingQueue<String> stream, Client client, IndexConfig indexConfig,
+    public Indexer(BlockingQueue<String> stream, Client client, ExecutableScript script, IndexConfig indexConfig,
                    CouchdbDatabaseConfig databaseConfig, RiverConfig riverConfig) {
         this.stream = stream;
         this.client = client;
+        this.script = script;
         this.indexConfig = indexConfig;
         this.databaseConfig = databaseConfig;
         this.riverConfig = riverConfig;
 
-        logger = LoggerHelper.indexerLogger(Indexer.class, this.databaseConfig.getDatabase());
+        logger = indexerLogger(Indexer.class, this.databaseConfig.getDatabase());
     }
 
     @Override
     public void run() {
-        while (true) {
-            if (closed) {
-                return;
-            }
+        while (!closed) {
             String s;
             try {
                 s = stream.take();
@@ -223,6 +221,10 @@ public class Indexer implements Runnable {
             index = indexConfig.getName();
         }
         return index;
+    }
+
+    public void close() {
+        closed = true;
     }
 }
 

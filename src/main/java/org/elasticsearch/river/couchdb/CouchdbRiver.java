@@ -49,8 +49,7 @@ import static org.elasticsearch.river.couchdb.util.Sleeper.sleepLong;
 public class CouchdbRiver extends AbstractRiverComponent implements River {
 
     private final Client client;
-
-    private final String riverIndexName;
+    private final ScriptService scriptService;
 
     private final IndexConfig indexConfig;
     private final CouchdbConnectionConfig connectionConfig;
@@ -61,8 +60,6 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
     private volatile boolean closed;
 
     private BlockingQueue<String> stream;
-    private final ExecutableScript script;
-
     private Slurper slurper;
     private Indexer indexer;
 
@@ -70,14 +67,13 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
     public CouchdbRiver(RiverName riverName, RiverSettings riverSettings, @RiverIndexName String riverIndexName,
                         Client client, ScriptService scriptService) {
         super(riverName, riverSettings);
-        this.riverIndexName = riverIndexName;
         this.client = client;
+        this.scriptService = scriptService;
 
         indexConfig = IndexConfig.fromRiverSettings(riverSettings);
         connectionConfig = CouchdbConnectionConfig.fromRiverSettings(riverSettings);
         databaseConfig = CouchdbDatabaseConfig.fromRiverSettings(riverSettings);
         riverConfig = new RiverConfig(riverName, riverSettings, riverIndexName);
-        script = databaseConfig.getScript(scriptService);
     }
 
     @Override
@@ -96,7 +92,9 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
         CouchdbHttpClient couchdbHttpClient = new CouchdbHttpClient(null, connectionConfig, changeHandler);
         slurper = new Slurper(db, lastSeqReader, urlBuilder, couchdbHttpClient);
 
-        indexer = new Indexer(stream, client, indexConfig, databaseConfig, riverConfig);
+
+        ExecutableScript script = databaseConfig.getScript(scriptService);
+        indexer = new Indexer(stream, client, script, indexConfig, databaseConfig, riverConfig);
 
         threads.add(slurperFactory.newThread(slurper));
         threads.add(indexerFactory.newThread(indexer));
@@ -148,6 +146,7 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
             }
             closed = true;
             slurper.close();
+            indexer.close();
         }
     }
 }
