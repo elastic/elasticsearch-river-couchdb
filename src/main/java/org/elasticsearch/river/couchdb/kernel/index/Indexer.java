@@ -89,30 +89,9 @@ public class Indexer implements Runnable {
         }
 
         if (lastSeq != null) {
-            // we always store it as a string
-            String lastSeqAsString = null;
-            if (lastSeq instanceof List) {
-                // bigcouch uses array for the seq
-                try {
-                    XContentBuilder builder = XContentFactory.jsonBuilder();
-                    //builder.startObject();
-                    builder.startArray();
-                    for (Object value : ((List) lastSeq)) {
-                        builder.value(value);
-                    }
-                    builder.endArray();
-                    //builder.endObject();
-                    lastSeqAsString = builder.string();
-                } catch (Exception e) {
-                    logger.error("failed to convert last_seq to a json string", e);
-                }
-            } else {
-                lastSeqAsString = lastSeq.toString();
-            }
-            if (logger.isTraceEnabled()) {
-                logger.trace("processing [_seq  ]: [{}]/[{}]/[{}], last_seq [{}]",
-                        riverConfig.getRiverIndexName(), riverConfig.getRiverName().name(), "_seq", lastSeqAsString);
-            }
+            String lastSeqAsString = standarizeLastSeq(lastSeq);
+
+            logger.debug("Will update {} to [{}].", LAST_SEQ, lastSeqAsString);
             bulk.add(aRequestToUpdateLastSeq(lastSeqAsString));
         }
 
@@ -124,6 +103,25 @@ public class Indexer implements Runnable {
             }
         } catch (Exception e) {
             logger.warn("failed to execute bulk", e);
+        }
+    }
+
+    private String standarizeLastSeq(Object lastSeq) {
+        if (lastSeq instanceof List) {
+            // bigcouch uses array for the seq
+            try {
+                XContentBuilder builder = jsonBuilder().startArray();
+                for (Object value : ((List) lastSeq)) {
+                    builder.value(value);
+                }
+                builder.endArray();
+                return builder.string();
+            } catch (Exception e) {
+                logger.error("Failed to convert {} to JSON.", LAST_SEQ);
+                throw propagate(e);
+            }
+        } else {
+            return lastSeq.toString();
         }
     }
 
