@@ -16,14 +16,16 @@ public class ChangeProcessor {
     private final ESLogger logger;
 
     private final ExecutableScript script;
-    private final RequestFactory requestFactory;
     private final IndexConfig indexConfig;
+    private final OnIndexHook onIndexHook;
+    private final OnDeleteHook onDeleteHook;
 
-    public ChangeProcessor(String database, ExecutableScript script, RequestFactory requestFactory,
-                           IndexConfig indexConfig) {
+    public ChangeProcessor(String database, ExecutableScript script, IndexConfig indexConfig,
+                           OnIndexHook onIndexHook, OnDeleteHook onDeleteHook) {
         this.script = script;
-        this.requestFactory = requestFactory;
         this.indexConfig = indexConfig;
+        this.onIndexHook = onIndexHook;
+        this.onDeleteHook = onDeleteHook;
 
         logger = indexerLogger(ChangeProcessor.class, database);
     }
@@ -53,17 +55,11 @@ public class ChangeProcessor {
         @SuppressWarnings("unchecked")
         Map<String, Object> doc = (Map<String, Object>) ctx.get("doc");
 
-        String index = extractIndex(ctx);
-        String type = extractType(ctx);
-        String routing = extractRouting(ctx);
-        String parent = extractParent(ctx);
-
         if (Boolean.TRUE.equals(ctx.get("ignore"))) {
             logger.debug("Ignoring update of document [id={}]; CouchDB changes feed seq=[{}].", id, seq);
         } else if (Boolean.TRUE.equals(ctx.get("deleted"))) {
             logger.debug("Processing document [id={}] marked as \"deleted\"; CouchDB changes feed seq=[{}].", id, seq);
-
-            bulk.add(requestFactory.aDeleteRequest(index, type, id, routing, parent));
+            bulk.add(onDeleteHook.onDelete(doc));
         } else if (doc != null) {
             doc.remove("_rev");
 
@@ -73,9 +69,8 @@ public class ChangeProcessor {
                 // TODO CouchDB river does not really store attachments but only its meta-information
             }
 
-            logger.trace("Processing document=[{}]; CouchDB changes feed seq=[{}].", doc, seq);
-
-            bulk.add(requestFactory.anIndexRequest(index, type, id, doc, routing, parent));
+            logger.debug("Processing indexing of document [id={}]; CouchDB changes feed seq=[{}].", id, seq);
+            bulk.add(onIndexHook.onIndex(doc));
         } else {
             logger.warn("Ignoring unknown change=[{}]; CouchDB changes feed seq=[{}].", change, seq);
         }
@@ -111,29 +106,5 @@ public class ChangeProcessor {
             script.run();
             return (Map<String, Object>) script.unwrap(ctx);
         }
-    }
-
-    private String extractIndex(Map<String, Object> ctx) {
-        String index = (String) ctx.get("_index");
-        if (index == null) {
-            index = indexConfig.getName();
-        }
-        return index;
-    }
-
-    private String extractType(Map<String, Object> ctx) {
-        String type = (String) ctx.get("_type");
-        if (type == null) {
-            type = indexConfig.getType();
-        }
-        return type;
-    }
-
-    private String extractRouting(Map<String, Object> ctx) {
-        return (String) ctx.get("_routing");
-    }
-
-    private String extractParent(Map<String, Object> ctx) {
-        return (String) ctx.get("_parent");
     }
 }

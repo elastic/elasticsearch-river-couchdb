@@ -27,8 +27,13 @@ import org.elasticsearch.indices.IndexAlreadyExistsException;
 import org.elasticsearch.river.*;
 import org.elasticsearch.river.couchdb.kernel.index.ChangeCollector;
 import org.elasticsearch.river.couchdb.kernel.index.ChangeProcessor;
+import org.elasticsearch.river.couchdb.kernel.index.DefaultOnDeleteHook;
+import org.elasticsearch.river.couchdb.kernel.index.DefaultOnIndexHook;
+import org.elasticsearch.river.couchdb.kernel.index.DocumentHelper;
 import org.elasticsearch.river.couchdb.kernel.index.Indexer;
 import org.elasticsearch.river.couchdb.kernel.index.LastSeqFormatter;
+import org.elasticsearch.river.couchdb.kernel.index.OnDeleteHook;
+import org.elasticsearch.river.couchdb.kernel.index.OnIndexHook;
 import org.elasticsearch.river.couchdb.kernel.index.RequestFactory;
 import org.elasticsearch.river.couchdb.kernel.slurp.ChangeHandler;
 import org.elasticsearch.river.couchdb.kernel.slurp.CouchdbHttpClient;
@@ -99,7 +104,10 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
         LastSeqFormatter lastSeqFormatter = new LastSeqFormatter(db);
         ExecutableScript script = databaseConfig.getScript(scriptService);
         RequestFactory requestFactory = new RequestFactory(db, riverConfig);
-        ChangeProcessor changeProcessor = new ChangeProcessor(db, script, requestFactory, indexConfig);
+        DocumentHelper documentHelper = new DocumentHelper(indexConfig);
+        OnDeleteHook onDeleteHook = new DefaultOnDeleteHook(db, requestFactory, documentHelper);
+        OnIndexHook onIndexHook = new DefaultOnIndexHook(db, requestFactory, documentHelper);
+        ChangeProcessor changeProcessor = new ChangeProcessor(db, script, indexConfig, onIndexHook, onDeleteHook);
         ChangeCollector changeCollector = new ChangeCollector(stream, indexConfig, changeProcessor);
         indexer = new Indexer(db, changeCollector, client, lastSeqFormatter, requestFactory);
 
