@@ -6,6 +6,7 @@ import static org.elasticsearch.client.Requests.indexRequest;
 import static org.elasticsearch.common.base.Optional.fromNullable;
 import static org.elasticsearch.common.base.Throwables.propagate;
 import static org.elasticsearch.common.xcontent.XContentFactory.jsonBuilder;
+import static org.elasticsearch.common.xcontent.XContentFactory.xContent;
 import static org.elasticsearch.river.couchdb.util.LoggerHelper.indexerLogger;
 import static org.elasticsearch.river.couchdb.util.Sleeper.sleepLong;
 import org.elasticsearch.ElasticSearchException;
@@ -17,7 +18,6 @@ import org.elasticsearch.common.Nullable;
 import org.elasticsearch.common.base.Optional;
 import org.elasticsearch.common.logging.ESLogger;
 import org.elasticsearch.common.xcontent.XContentBuilder;
-import org.elasticsearch.common.xcontent.XContentFactory;
 import org.elasticsearch.common.xcontent.XContentType;
 import org.elasticsearch.river.couchdb.IndexConfig;
 import org.elasticsearch.river.couchdb.RiverConfig;
@@ -39,8 +39,8 @@ public class Indexer implements Runnable {
 
     private ExecutableScript script;
     private final IndexConfig indexConfig;
-
     private final RiverConfig riverConfig;
+
     private volatile boolean closed;
 
     public Indexer(String database, BlockingQueue<String> stream, Client client, LastSeqFormatter lastSeqFormatter,
@@ -109,15 +109,12 @@ public class Indexer implements Runnable {
     private Object processChanges(BulkRequestBuilder bulk) throws InterruptedException {
         String change = changesStream.take();
 
-        Object lastSeq = null;
-        Object lineSeq = processLine(change, bulk);
-        if (lineSeq != null) {
-            lastSeq = lineSeq;
-        }
+        Object lineSeq = processChange(change, bulk);
+        Object lastSeq = lineSeq;
 
         // spin a bit to see if we can get some more changes
         while ((change = changesStream.poll(indexConfig.getBulkTimeout().millis(), MILLISECONDS)) != null) {
-            lineSeq = processLine(change, bulk);
+            lineSeq = processChange(change, bulk);
             if (lineSeq != null) {
                 lastSeq = lineSeq;
             }
@@ -149,74 +146,80 @@ public class Indexer implements Runnable {
         }
     }
 
-    @SuppressWarnings({"unchecked"})
-    private Object processLine(String s, BulkRequestBuilder bulk) {
+    @Nullable
+    private Object processChange(String change, BulkRequestBuilder bulk) {
         Map<String, Object> ctx;
         try {
-            ctx = XContentFactory.xContent(XContentType.JSON).createParser(s).mapAndClose();
+            ctx = xContent(XContentType.JSON).createParser(change).mapAndClose();
         } catch (IOException e) {
-            logger.warn("failed to parse {}", e, s);
+            logger.warn("Failed to parse change=[{}].", e, change);
             return null;
         }
         if (ctx.containsKey("error")) {
-            logger.warn("received error {}", s);
+            logger.warn("Error=[{}] when processing change=[{}], reason=[{}].",
+                    ctx.get("error"), change, ctx.get("reason"));
             return null;
         }
-        Object seq = ctx.get("seq");
+        if (!ctx.containsKey("id") || !ctx.containsKey("seq")) {
+            logger.warn("Missing id or seq in change=[{}].", change);
+            return null;
+        }
+
+        String seq = ctx.get("seq").toString();
         String id = ctx.get("id").toString();
 
-        // Ignore design documents
         if (id.startsWith("_design/")) {
-            if (logger.isTraceEnabled()) {
-                logger.trace("ignoring design document {}", id);
-            }
+            logger.trace("Ignoring design document with id=[{}].", id);
             return seq;
         }
 
-        if (script != null) {
-            script.setNextVar("ctx", ctx);
-            try {
-                script.run();
-                // we need to unwrap the ctx...
-                ctx = (Map<String, Object>) script.unwrap(ctx);
-            } catch (Exception e) {
-                logger.warn("failed to script process {}, ignoring", e, ctx);
-                return seq;
-            }
+        try {
+            runScriptIfProvided(ctx);
+        } catch (Exception e) {
+            logger.warn("Failed to run script on context=[{}].", e, ctx);
+            return seq;
         }
 
-        if (ctx.containsKey("ignore") && ctx.get("ignore").equals(Boolean.TRUE)) {
-            // ignore dock
-        } else if (ctx.containsKey("deleted") && ctx.get("deleted").equals(Boolean.TRUE)) {
-            String index = extractIndex(ctx);
-            String type = extractType(ctx);
-            if (logger.isTraceEnabled()) {
-                logger.trace("processing [delete]: [{}]/[{}]/[{}]", index, type, id);
-            }
-            bulk.add(deleteRequest(index).type(type).id(id).routing(extractRouting(ctx)).parent(extractParent(ctx)));
-        } else if (ctx.containsKey("doc")) {
-            String index = extractIndex(ctx);
-            String type = extractType(ctx);
-            Map<String, Object> doc = (Map<String, Object>) ctx.get("doc");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> doc = (Map<String, Object>) ctx.get("doc");
 
-            // Remove _attachment from doc if needed
+        if (Boolean.TRUE.equals(ctx.get("ignore"))) {
+            logger.debug("Ignoring update of document [id={}]; CouchDB changes feed seq=[{}].", id, seq);
+        } else if (Boolean.TRUE.equals(ctx.get("deleted"))) {
+            logger.debug("Processing document [id={}] marked as \"deleted\"; CouchDB changes feed seq=[{}].", id, seq);
+
+            String index = extractIndex(ctx);
+            String type = extractType(ctx);
+            bulk.add(deleteRequest(index).type(type).id(id).routing(extractRouting(ctx)).parent(extractParent(ctx)));
+        } else if (doc != null) {
+            doc.remove("_rev");
+
             if (indexConfig.shouldIgnoreAttachments()) {
-                // no need to log that we removed it, the doc indexed will be shown without it
                 doc.remove("_attachments");
             } else {
-                // TODO by now, couchDB river does not really store attachments but only attachments meta infomration
-                // So we perhaps need to fully support attachments
+                // TODO CouchDB river does not really store attachments but only its meta-information
             }
 
-            if (logger.isTraceEnabled()) {
-                logger.trace("processing [index ]: [{}]/[{}]/[{}], source {}", index, type, id, doc);
-            }
+            logger.trace("Processing document=[{}]; CouchDB changes feed seq=[{}].", doc, seq);
 
+            String index = extractIndex(ctx);
+            String type = extractType(ctx);
             bulk.add(indexRequest(index).type(type).id(id).source(doc).routing(extractRouting(ctx)).parent(extractParent(ctx)));
         } else {
-            logger.warn("ignoring unknown change {}", s);
+            logger.warn("Ignoring unknown change=[{}]; CouchDB changes feed seq=[{}].", change, seq);
         }
         return seq;
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> runScriptIfProvided(Map<String, Object> ctx) {
+        if (script == null) {
+            return ctx;
+        } else {
+            script.setNextVar("ctx", ctx);
+            script.run();
+            return (Map<String, Object>) script.unwrap(ctx);
+        }
     }
 
     private String extractParent(Map<String, Object> ctx) {
