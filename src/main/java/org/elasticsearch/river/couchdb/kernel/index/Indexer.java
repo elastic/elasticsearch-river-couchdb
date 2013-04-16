@@ -4,23 +4,18 @@ import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static org.elasticsearch.client.Requests.deleteRequest;
 import static org.elasticsearch.client.Requests.indexRequest;
 import static org.elasticsearch.common.base.Optional.fromNullable;
-import static org.elasticsearch.common.base.Throwables.propagate;
-import static org.elasticsearch.common.xcontent.XContentFactory.jsonBuilder;
 import static org.elasticsearch.common.xcontent.XContentFactory.xContent;
 import static org.elasticsearch.river.couchdb.util.LoggerHelper.indexerLogger;
 import static org.elasticsearch.river.couchdb.util.Sleeper.sleepLong;
 import org.elasticsearch.ElasticSearchException;
 import org.elasticsearch.action.bulk.BulkRequestBuilder;
 import org.elasticsearch.action.bulk.BulkResponse;
-import org.elasticsearch.action.index.IndexRequest;
 import org.elasticsearch.client.Client;
 import org.elasticsearch.common.Nullable;
 import org.elasticsearch.common.base.Optional;
 import org.elasticsearch.common.logging.ESLogger;
-import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.common.xcontent.XContentType;
 import org.elasticsearch.river.couchdb.IndexConfig;
-import org.elasticsearch.river.couchdb.RiverConfig;
 import org.elasticsearch.script.ExecutableScript;
 import java.io.IOException;
 import java.util.Map;
@@ -32,27 +27,24 @@ public class Indexer implements Runnable {
 
     private final ESLogger logger;
 
-    private final String database;
     private final BlockingQueue<String> changesStream;
     private final Client client;
     private final LastSeqFormatter lastSeqFormatter;
+    private final RequestFactory requestFactory;
 
     private ExecutableScript script;
     private final IndexConfig indexConfig;
-    private final RiverConfig riverConfig;
 
     private volatile boolean closed;
 
     public Indexer(String database, BlockingQueue<String> stream, Client client, LastSeqFormatter lastSeqFormatter,
-                   ExecutableScript script, IndexConfig indexConfig,
-                   RiverConfig riverConfig) {
-        this.database = database;
+                   ExecutableScript script, RequestFactory requestFactory, IndexConfig indexConfig) {
         this.changesStream = stream;
         this.client = client;
         this.lastSeqFormatter = lastSeqFormatter;
         this.script = script;
+        this.requestFactory = requestFactory;
         this.indexConfig = indexConfig;
-        this.riverConfig = riverConfig;
 
         logger = indexerLogger(Indexer.class, database);
     }
@@ -84,7 +76,7 @@ public class Indexer implements Runnable {
         String lastSeq = lastSeqFormatter.format(rawLastSeq);
 
         if (lastSeq != null) {
-            bulk.add(aRequestToUpdateLastSeq(lastSeq));
+            bulk.add(requestFactory.aRequestToUpdateLastSeq(lastSeq));
             logger.debug("Will update {} to [{}].", LAST_SEQ, lastSeq);
         }
 
@@ -126,26 +118,6 @@ public class Indexer implements Runnable {
         return lastSeq;
     }
 
-    private IndexRequest aRequestToUpdateLastSeq(String lastSeq) {
-        logger.debug("Will update {} to [{}].", LAST_SEQ, lastSeq);
-
-        return indexRequest(riverConfig.getRiverIndexName())
-                .type(riverConfig.getRiverName().name())
-                .id("_seq")
-                .source(lastSeqSource(lastSeq));
-    }
-
-    private XContentBuilder lastSeqSource(String lastSeq) {
-        try {
-            return jsonBuilder().startObject()
-                    .startObject(database).field(LAST_SEQ, lastSeq).endObject()
-                    .endObject();
-        } catch (IOException ioe) {
-            logger.error("Could not build a valid JSON to carry information about {}.", LAST_SEQ);
-            throw propagate(ioe);
-        }
-    }
-
     @Nullable
     private Object processChange(String change, BulkRequestBuilder bulk) {
         Map<String, Object> ctx;
@@ -183,14 +155,17 @@ public class Indexer implements Runnable {
         @SuppressWarnings("unchecked")
         Map<String, Object> doc = (Map<String, Object>) ctx.get("doc");
 
+        String index = extractIndex(ctx);
+        String type = extractType(ctx);
+        String routing = extractRouting(ctx);
+        String parent = extractParent(ctx);
+
         if (Boolean.TRUE.equals(ctx.get("ignore"))) {
             logger.debug("Ignoring update of document [id={}]; CouchDB changes feed seq=[{}].", id, seq);
         } else if (Boolean.TRUE.equals(ctx.get("deleted"))) {
             logger.debug("Processing document [id={}] marked as \"deleted\"; CouchDB changes feed seq=[{}].", id, seq);
 
-            String index = extractIndex(ctx);
-            String type = extractType(ctx);
-            bulk.add(deleteRequest(index).type(type).id(id).routing(extractRouting(ctx)).parent(extractParent(ctx)));
+            bulk.add(requestFactory.aDeleteRequest(index, type, id, routing, parent));
         } else if (doc != null) {
             doc.remove("_rev");
 
@@ -202,9 +177,7 @@ public class Indexer implements Runnable {
 
             logger.trace("Processing document=[{}]; CouchDB changes feed seq=[{}].", doc, seq);
 
-            String index = extractIndex(ctx);
-            String type = extractType(ctx);
-            bulk.add(indexRequest(index).type(type).id(id).source(doc).routing(extractRouting(ctx)).parent(extractParent(ctx)));
+            bulk.add(requestFactory.anIndexRequest(index, type, id, doc, routing, parent));
         } else {
             logger.warn("Ignoring unknown change=[{}]; CouchDB changes feed seq=[{}].", change, seq);
         }

@@ -27,6 +27,7 @@ import org.elasticsearch.indices.IndexAlreadyExistsException;
 import org.elasticsearch.river.*;
 import org.elasticsearch.river.couchdb.kernel.index.Indexer;
 import org.elasticsearch.river.couchdb.kernel.index.LastSeqFormatter;
+import org.elasticsearch.river.couchdb.kernel.index.RequestFactory;
 import org.elasticsearch.river.couchdb.kernel.slurp.ChangeHandler;
 import org.elasticsearch.river.couchdb.kernel.slurp.CouchdbHttpClient;
 import org.elasticsearch.river.couchdb.kernel.slurp.LastSeqReader;
@@ -93,10 +94,10 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
         CouchdbHttpClient couchdbHttpClient = new CouchdbHttpClient(null, connectionConfig, changeHandler);
         slurper = new Slurper(db, lastSeqReader, urlBuilder, couchdbHttpClient);
 
-
         LastSeqFormatter lastSeqFormatter = new LastSeqFormatter(db);
         ExecutableScript script = databaseConfig.getScript(scriptService);
-        indexer = new Indexer(db, stream, client, lastSeqFormatter, script, indexConfig, riverConfig);
+        RequestFactory requestFactory = new RequestFactory(db, riverConfig);
+        indexer = new Indexer(db, stream, client, lastSeqFormatter, script, requestFactory, indexConfig);
 
         threads.add(slurperFactory.newThread(slurper));
         threads.add(indexerFactory.newThread(indexer));
