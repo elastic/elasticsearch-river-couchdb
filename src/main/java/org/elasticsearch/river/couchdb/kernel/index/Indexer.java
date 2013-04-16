@@ -1,10 +1,9 @@
 package org.elasticsearch.river.couchdb.kernel.index;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
-import static org.elasticsearch.client.Requests.deleteRequest;
-import static org.elasticsearch.client.Requests.indexRequest;
 import static org.elasticsearch.common.base.Optional.fromNullable;
 import static org.elasticsearch.common.xcontent.XContentFactory.xContent;
+import static org.elasticsearch.common.xcontent.XContentType.JSON;
 import static org.elasticsearch.river.couchdb.util.LoggerHelper.indexerLogger;
 import static org.elasticsearch.river.couchdb.util.Sleeper.sleepLong;
 import org.elasticsearch.ElasticSearchException;
@@ -14,7 +13,6 @@ import org.elasticsearch.client.Client;
 import org.elasticsearch.common.Nullable;
 import org.elasticsearch.common.base.Optional;
 import org.elasticsearch.common.logging.ESLogger;
-import org.elasticsearch.common.xcontent.XContentType;
 import org.elasticsearch.river.couchdb.IndexConfig;
 import org.elasticsearch.script.ExecutableScript;
 import java.io.IOException;
@@ -86,17 +84,6 @@ public class Indexer implements Runnable {
         return fromNullable(lastSeq);
     }
 
-    private void executeBulkRequest(BulkRequestBuilder bulk) {
-        try {
-            BulkResponse response = bulk.execute().actionGet();
-            if (response.hasFailures()) {
-                throw new BulkRequestException(response.buildFailureMessage());
-            }
-        } catch (ElasticSearchException ese) {
-            throw new BulkRequestException(ese);
-        }
-    }
-
     @Nullable
     private Object processChanges(BulkRequestBuilder bulk) throws InterruptedException {
         String change = changesStream.take();
@@ -118,11 +105,22 @@ public class Indexer implements Runnable {
         return lastSeq;
     }
 
+    private void executeBulkRequest(BulkRequestBuilder bulk) {
+        try {
+            BulkResponse response = bulk.execute().actionGet();
+            if (response.hasFailures()) {
+                throw new BulkRequestException(response.buildFailureMessage());
+            }
+        } catch (ElasticSearchException ese) {
+            throw new BulkRequestException(ese);
+        }
+    }
+
     @Nullable
     private Object processChange(String change, BulkRequestBuilder bulk) {
         Map<String, Object> ctx;
         try {
-            ctx = xContent(XContentType.JSON).createParser(change).mapAndClose();
+            ctx = xContent(JSON).createParser(change).mapAndClose();
         } catch (IOException e) {
             logger.warn("Failed to parse change=[{}].", e, change);
             return null;

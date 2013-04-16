@@ -107,6 +107,14 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
         }
     }
 
+    public void initializeStream() {
+        if (indexConfig.getThrottleSize() > 0) {
+            stream = new ArrayBlockingQueue<String>(indexConfig.getThrottleSize());
+        } else {
+            stream = new LinkedTransferQueue<String>();
+        }
+    }
+
     private void initializeIndex() {
         logger.info("starting couchdb stream: url [{}], database [{}], indexing to [{}]/[{}]",
                 connectionConfig.getUrl(), databaseConfig.getDatabase(), indexConfig.getName(), indexConfig.getType());
@@ -129,14 +137,6 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
                     propagate(e);
                 }
             }
-        }
-    }
-
-    public void initializeStream() {
-        if (indexConfig.getThrottleSize() > 0) {
-            stream = new ArrayBlockingQueue<String>(indexConfig.getThrottleSize());
-        } else {
-            stream = new LinkedTransferQueue<String>();
         }
     }
 
