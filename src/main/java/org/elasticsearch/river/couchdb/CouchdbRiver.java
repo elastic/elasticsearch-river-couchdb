@@ -52,9 +52,6 @@ import static org.elasticsearch.common.collect.Lists.newArrayList;
 import static org.elasticsearch.common.util.concurrent.EsExecutors.daemonThreadFactory;
 import static org.elasticsearch.river.couchdb.util.Sleeper.sleepLong;
 
-/**
- *
- */
 public class CouchdbRiver extends AbstractRiverComponent implements River {
 
     private final Client client;
@@ -91,28 +88,9 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
 
         initializeIndex();
 
-        ThreadFactory slurperFactory = daemonThreadFactory(settings.globalSettings(), "couchdb_river_slurper");
-        ThreadFactory indexerFactory = daemonThreadFactory(settings.globalSettings(), "couchdb_river_indexer");
-
         String db = databaseConfig.getDatabase();
-        LastSeqReader lastSeqReader = new LastSeqReader(databaseConfig, riverConfig, client);
-        UrlBuilder urlBuilder = new UrlBuilder(connectionConfig, databaseConfig);
-        ChangeHandler changeHandler = new ChangeHandler(db, stream);
-        CouchdbHttpClient couchdbHttpClient = new CouchdbHttpClient(null, connectionConfig, changeHandler);
-        slurper = new Slurper(db, lastSeqReader, urlBuilder, couchdbHttpClient);
-
-        LastSeqFormatter lastSeqFormatter = new LastSeqFormatter(db);
-        ExecutableScript script = databaseConfig.getScript(scriptService);
-        RequestFactory requestFactory = new RequestFactory(db, riverConfig);
-        DocumentHelper documentHelper = new DocumentHelper(indexConfig);
-        OnDeleteHook onDeleteHook = new DefaultOnDeleteHook(db, requestFactory, documentHelper);
-        OnIndexHook onIndexHook = new DefaultOnIndexHook(db, requestFactory, documentHelper);
-        ChangeProcessor changeProcessor = new ChangeProcessor(db, script, indexConfig, onIndexHook, onDeleteHook);
-        ChangeCollector changeCollector = new ChangeCollector(stream, indexConfig, changeProcessor);
-        indexer = new Indexer(db, changeCollector, client, lastSeqFormatter, requestFactory);
-
-        threads.add(slurperFactory.newThread(slurper));
-        threads.add(indexerFactory.newThread(indexer));
+        prepareSlurper(db);
+        prepareIndexer(db);
 
         for (Thread thread : threads) {
             thread.start();
@@ -128,7 +106,7 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
     }
 
     private void initializeIndex() {
-        logger.info("starting couchdb stream: url [{}], database [{}], indexing to [{}]/[{}]",
+        logger.info("Initializing index for CouchDB river: url [{}], database [{}], indexing to [{}]/[{}].",
                 connectionConfig.getUrl(), databaseConfig.getDatabase(), indexConfig.getName(), indexConfig.getType());
         int maxAttempts = 10;
         for (int i = 1; i <= maxAttempts; ++i) {
@@ -145,23 +123,49 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
                     logger.warn("Cluster not recovered yet. Retrying...");
                     sleepLong("to give the cluster some time to recover.");
                 } else {
-                    logger.warn("failed to create index [{}], disabling river...", e, indexConfig.getName());
+                    logger.error("Failed to create index=[{}]. River will be disabled.", e, indexConfig.getName());
                     propagate(e);
                 }
             }
         }
     }
 
+    private void prepareSlurper(String db) {
+        ChangeHandler changeHandler = new ChangeHandler(db, stream);
+        CouchdbHttpClient couchdbHttpClient = new CouchdbHttpClient(null, connectionConfig, changeHandler);
+        UrlBuilder urlBuilder = new UrlBuilder(connectionConfig, databaseConfig);
+        LastSeqReader lastSeqReader = new LastSeqReader(databaseConfig, riverConfig, client);
+        slurper = new Slurper(db, lastSeqReader, urlBuilder, couchdbHttpClient);
+
+        ThreadFactory slurperFactory = daemonThreadFactory(settings.globalSettings(), "couchdb_river_slurper");
+        threads.add(slurperFactory.newThread(slurper));
+    }
+
+    private void prepareIndexer(String db) {
+        RequestFactory requestFactory = new RequestFactory(db, riverConfig);
+        DocumentHelper documentHelper = new DocumentHelper(indexConfig);
+        OnDeleteHook onDeleteHook = new DefaultOnDeleteHook(db, requestFactory, documentHelper);
+        OnIndexHook onIndexHook = new DefaultOnIndexHook(db, requestFactory, documentHelper);
+        ExecutableScript script = databaseConfig.getScript(scriptService);
+        ChangeProcessor changeProcessor = new ChangeProcessor(db, script, indexConfig, onIndexHook, onDeleteHook);
+        ChangeCollector changeCollector = new ChangeCollector(stream, indexConfig, changeProcessor);
+        LastSeqFormatter lastSeqFormatter = new LastSeqFormatter(db);
+        indexer = new Indexer(db, changeCollector, client, lastSeqFormatter, requestFactory);
+
+        ThreadFactory indexerFactory = daemonThreadFactory(settings.globalSettings(), "couchdb_river_indexer");
+        threads.add(indexerFactory.newThread(indexer));
+    }
+
     @Override
     public void close() {
         if (!closed) {
-            logger.info("closing couchdb stream river");
-            for (Thread thread : threads) {
-                thread.interrupt();
-            }
+            logger.info("Closing CouchDB river.");
             closed = true;
             slurper.close();
             indexer.close();
+            for (Thread thread : threads) {
+                thread.interrupt();
+            }
         }
     }
 }
