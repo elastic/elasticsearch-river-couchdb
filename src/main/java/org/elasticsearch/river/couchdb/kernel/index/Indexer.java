@@ -9,6 +9,7 @@ import org.elasticsearch.action.bulk.BulkRequestBuilder;
 import org.elasticsearch.action.bulk.BulkResponse;
 import org.elasticsearch.client.Client;
 import org.elasticsearch.common.Nullable;
+import org.elasticsearch.common.annotations.VisibleForTesting;
 import org.elasticsearch.common.base.Optional;
 import org.elasticsearch.common.logging.ESLogger;
 import org.elasticsearch.river.couchdb.IndexConfig;
@@ -62,7 +63,8 @@ public class Indexer implements Runnable {
         logger.info("Closed.");
     }
 
-    private Optional<String> index() throws InterruptedException {
+    @VisibleForTesting
+    Optional<String> index() throws InterruptedException {
         BulkRequestBuilder bulk = client.prepareBulk();
 
         Object rawLastSeq = processChanges(bulk);
