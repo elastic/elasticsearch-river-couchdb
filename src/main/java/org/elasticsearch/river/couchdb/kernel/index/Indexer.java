@@ -1,6 +1,5 @@
 package org.elasticsearch.river.couchdb.kernel.index;
 
-import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static org.elasticsearch.common.base.Optional.fromNullable;
 import static org.elasticsearch.river.couchdb.util.LoggerHelper.indexerLogger;
 import static org.elasticsearch.river.couchdb.util.Sleeper.sleepLong;
@@ -8,12 +7,9 @@ import org.elasticsearch.ElasticSearchException;
 import org.elasticsearch.action.bulk.BulkRequestBuilder;
 import org.elasticsearch.action.bulk.BulkResponse;
 import org.elasticsearch.client.Client;
-import org.elasticsearch.common.Nullable;
 import org.elasticsearch.common.annotations.VisibleForTesting;
 import org.elasticsearch.common.base.Optional;
 import org.elasticsearch.common.logging.ESLogger;
-import org.elasticsearch.river.couchdb.IndexConfig;
-import java.util.concurrent.BlockingQueue;
 
 public class Indexer implements Runnable {
 
@@ -21,24 +17,19 @@ public class Indexer implements Runnable {
 
     private final ESLogger logger;
 
-    private final BlockingQueue<String> changesStream;
+    private final ChangeCollector changeCollector;
     private final Client client;
     private final LastSeqFormatter lastSeqFormatter;
-    private final ChangeProcessor changeProcessor;
     private final RequestFactory requestFactory;
-
-    private final IndexConfig indexConfig;
 
     private volatile boolean closed;
 
-    public Indexer(String database, BlockingQueue<String> stream, Client client, LastSeqFormatter lastSeqFormatter,
-                   ChangeProcessor changeProcessor, RequestFactory requestFactory, IndexConfig indexConfig) {
-        this.changesStream = stream;
+    public Indexer(String database, ChangeCollector changeCollector, Client client, LastSeqFormatter lastSeqFormatter,
+                   RequestFactory requestFactory) {
+        this.changeCollector = changeCollector;
         this.client = client;
         this.lastSeqFormatter = lastSeqFormatter;
-        this.changeProcessor = changeProcessor;
         this.requestFactory = requestFactory;
-        this.indexConfig = indexConfig;
 
         logger = indexerLogger(Indexer.class, database);
     }
@@ -67,7 +58,7 @@ public class Indexer implements Runnable {
     Optional<String> index() throws InterruptedException {
         BulkRequestBuilder bulk = client.prepareBulk();
 
-        Object rawLastSeq = processChanges(bulk);
+        Object rawLastSeq = changeCollector.collectAndProcessChanges(bulk);
         String lastSeq = lastSeqFormatter.format(rawLastSeq);
 
         if (lastSeq != null) {
@@ -79,27 +70,6 @@ public class Indexer implements Runnable {
             executeBulkRequest(bulk);
         }
         return fromNullable(lastSeq);
-    }
-
-    @Nullable
-    private Object processChanges(BulkRequestBuilder bulk) throws InterruptedException {
-        String change = changesStream.take();
-
-        Object lineSeq = changeProcessor.processChange(change, bulk);
-        Object lastSeq = lineSeq;
-
-        // spin a bit to see if we can get some more changes
-        while ((change = changesStream.poll(indexConfig.getBulkTimeout().millis(), MILLISECONDS)) != null) {
-            lineSeq = changeProcessor.processChange(change, bulk);
-            if (lineSeq != null) {
-                lastSeq = lineSeq;
-            }
-
-            if (bulk.numberOfActions() >= indexConfig.getBulkSize()) {
-                break;
-            }
-        }
-        return lastSeq;
     }
 
     private void executeBulkRequest(BulkRequestBuilder bulk) {

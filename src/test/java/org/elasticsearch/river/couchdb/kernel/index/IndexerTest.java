@@ -1,6 +1,5 @@
 package org.elasticsearch.river.couchdb.kernel.index;
 
-import static org.elasticsearch.common.unit.TimeValue.timeValueMillis;
 import static org.fest.assertions.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Matchers.any;
@@ -14,42 +13,33 @@ import org.elasticsearch.action.bulk.BulkResponse;
 import org.elasticsearch.action.index.IndexRequest;
 import org.elasticsearch.client.Client;
 import org.elasticsearch.common.base.Optional;
-import org.elasticsearch.river.couchdb.IndexConfig;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.runners.MockitoJUnitRunner;
-import java.util.concurrent.BlockingQueue;
 
 @RunWith(MockitoJUnitRunner.class)
 public class IndexerTest {
 
     @Mock
-    private BlockingQueue<String> changesStream;
+    private ChangeCollector changeCollector;
     @Mock
     private Client client;
     @Mock
     private LastSeqFormatter lastSeqFormatter;
     @Mock
-    private ChangeProcessor changeProcessor;
-    @Mock
     private RequestFactory requestFactory;
-    @Mock
-    private IndexConfig indexConfig;
     @Mock
     private BulkRequestBuilder bulk;
 
     @InjectMocks
     private Indexer indexer;
 
-    private String change = "{\"seq\":1337,\"id\":\"foo\",\"changes\":[{\"rev\":\"1-23202479633c2b380f79507a776743d5\"}]}";
-
     @Before
     public void initMocks() {
         given(client.prepareBulk()).willReturn(bulk);
-        given(indexConfig.getBulkTimeout()).willReturn(timeValueMillis(10));
 
         given(lastSeqFormatter.format(anyString())).willCallRealMethod();
     }
@@ -57,10 +47,8 @@ public class IndexerTest {
     @Test
     public void shouldIssueARequestToUpdateLastSeq() throws Exception {
         // given
-        givenReceivedChange();
-
         String seq = "1337";
-        givenProcessedChangeYieldsLastSeqEqualTo(seq);
+        givenReceivedChangeYieldsLastSeqEqualTo(seq);
 
         // when
         Optional<String> indexedSeq = indexer.index();
@@ -79,8 +67,7 @@ public class IndexerTest {
     @Test
     public void shouldNotExecuteAnyRequestsIfLastSeqAbsent() throws Exception {
         // given
-        givenReceivedChange();
-        givenProcessedChangeYieldsLastSeqEqualTo(null);
+        givenReceivedChangeYieldsLastSeqEqualTo(null);
 
         // when
         Optional<String> indexedSeq = indexer.index();
@@ -96,12 +83,8 @@ public class IndexerTest {
         assertThat(indexedSeq.isPresent()).isFalse();
     }
 
-    private void givenReceivedChange() throws Exception {
-        given(changesStream.take()).willReturn(change);
-    }
-
-    private void givenProcessedChangeYieldsLastSeqEqualTo(String seq) {
-        given(changeProcessor.processChange(change, bulk)).willReturn(seq);
+    private void givenReceivedChangeYieldsLastSeqEqualTo(String seq) throws Exception {
+        given(changeCollector.collectAndProcessChanges(bulk)).willReturn(seq);
     }
 
     @SuppressWarnings("unchecked")
