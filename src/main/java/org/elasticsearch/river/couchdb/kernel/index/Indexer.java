@@ -7,26 +7,26 @@ import static org.elasticsearch.river.couchdb.util.Sleeper.sleepLong;
 import org.elasticsearch.ElasticSearchException;
 import org.elasticsearch.action.bulk.BulkRequestBuilder;
 import org.elasticsearch.action.bulk.BulkResponse;
-import org.elasticsearch.client.Client;
 import org.elasticsearch.common.annotations.VisibleForTesting;
 import org.elasticsearch.common.base.Optional;
 import org.elasticsearch.common.logging.ESLogger;
+import org.elasticsearch.river.couchdb.kernel.shared.ClientWrapper;
 
 public class Indexer implements Runnable {
 
     private final ESLogger logger;
 
     private final ChangeCollector changeCollector;
-    private final Client client;
+    private final ClientWrapper clientWrapper;
     private final LastSeqFormatter lastSeqFormatter;
     private final RequestFactory requestFactory;
 
     private volatile boolean closed;
 
-    public Indexer(String database, ChangeCollector changeCollector, Client client, LastSeqFormatter lastSeqFormatter,
-                   RequestFactory requestFactory) {
+    public Indexer(String database, ChangeCollector changeCollector, ClientWrapper clientWrapper,
+                   LastSeqFormatter lastSeqFormatter, RequestFactory requestFactory) {
         this.changeCollector = changeCollector;
-        this.client = client;
+        this.clientWrapper = clientWrapper;
         this.lastSeqFormatter = lastSeqFormatter;
         this.requestFactory = requestFactory;
 
@@ -55,7 +55,7 @@ public class Indexer implements Runnable {
 
     @VisibleForTesting
     Optional<String> index() throws InterruptedException {
-        BulkRequestBuilder bulk = client.prepareBulk();
+        BulkRequestBuilder bulk = clientWrapper.prepareBulkRequest();
 
         Object rawLastSeq = changeCollector.collectAndProcessChanges(bulk);
         String lastSeq = lastSeqFormatter.format(rawLastSeq);
@@ -74,7 +74,7 @@ public class Indexer implements Runnable {
 
     private void executeBulkRequest(BulkRequestBuilder bulk) {
         try {
-            BulkResponse response = bulk.execute().actionGet();
+            BulkResponse response = clientWrapper.executeBulkRequest(bulk);
             if (response.hasFailures()) {
                 throw new BulkRequestException(response.buildFailureMessage());
             }

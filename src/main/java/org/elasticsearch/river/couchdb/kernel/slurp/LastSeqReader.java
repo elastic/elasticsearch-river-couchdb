@@ -5,12 +5,11 @@ import static org.elasticsearch.common.base.Optional.fromNullable;
 import static org.elasticsearch.river.couchdb.kernel.shared.Constants.LAST_SEQ;
 import static org.elasticsearch.river.couchdb.util.LoggerHelper.slurperLogger;
 import org.elasticsearch.action.get.GetResponse;
-import org.elasticsearch.client.Client;
-import org.elasticsearch.common.annotations.VisibleForTesting;
 import org.elasticsearch.common.base.Optional;
 import org.elasticsearch.common.logging.ESLogger;
 import org.elasticsearch.river.couchdb.CouchdbDatabaseConfig;
 import org.elasticsearch.river.couchdb.RiverConfig;
+import org.elasticsearch.river.couchdb.kernel.shared.ClientWrapper;
 import java.util.Map;
 
 public class LastSeqReader {
@@ -20,12 +19,12 @@ public class LastSeqReader {
     private final CouchdbDatabaseConfig databaseConfig;
     private final RiverConfig riverConfig;
 
-    private final Client client;
+    private final ClientWrapper clientWrapper;
 
-    public LastSeqReader(CouchdbDatabaseConfig databaseConfig, RiverConfig riverConfig, Client client) {
+    public LastSeqReader(CouchdbDatabaseConfig databaseConfig, RiverConfig riverConfig, ClientWrapper clientWrapper) {
         this.databaseConfig = databaseConfig;
         this.riverConfig = riverConfig;
-        this.client = client;
+        this.clientWrapper = clientWrapper;
 
         logger = slurperLogger(LastSeqReader.class, databaseConfig.getDatabase());
     }
@@ -44,15 +43,12 @@ public class LastSeqReader {
         return absent();
     }
 
-    @VisibleForTesting
-    void refreshIndex() {
-        client.admin().indices().prepareRefresh(riverConfig.getRiverIndexName()).execute().actionGet();
+    private void refreshIndex() {
+        clientWrapper.refreshIndex(riverConfig.getRiverIndexName());
     }
 
-    @VisibleForTesting
-    GetResponse doReadLastSeq() {
-        return client.prepareGet(riverConfig.getRiverIndexName(),
-                riverConfig.getRiverName().name(), LAST_SEQ).execute().actionGet();
+    private GetResponse doReadLastSeq() {
+        return clientWrapper.read(riverConfig.getRiverIndexName(), riverConfig.getRiverName().name(), LAST_SEQ);
     }
 
     private String parseLastSeq(GetResponse lastSeqResponse) {

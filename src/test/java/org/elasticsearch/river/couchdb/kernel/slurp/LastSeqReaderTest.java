@@ -4,13 +4,15 @@ import static org.elasticsearch.common.collect.Maps.newHashMap;
 import static org.elasticsearch.river.couchdb.kernel.shared.Constants.LAST_SEQ;
 import static org.fest.assertions.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Matchers.anyString;
 import org.elasticsearch.action.get.GetResponse;
-import org.elasticsearch.client.Client;
 import org.elasticsearch.common.base.Optional;
 import org.elasticsearch.river.couchdb.CouchdbDatabaseConfig;
 import org.elasticsearch.river.couchdb.RiverConfig;
+import org.elasticsearch.river.couchdb.kernel.shared.ClientWrapper;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.runners.MockitoJUnitRunner;
 import java.util.Map;
@@ -23,7 +25,10 @@ public class LastSeqReaderTest {
     @Mock
     private RiverConfig riverConfig;
     @Mock
-    private Client client;
+    private ClientWrapper clientWrapper;
+
+    @InjectMocks
+    private LastSeqReader lastSeqReader;
 
     @Mock
     private GetResponse mockedLastSeqResponse;
@@ -31,8 +36,6 @@ public class LastSeqReaderTest {
     @Test
     public void shouldReadAnExistingLastSequence() throws Exception {
         // given
-        LastSeqReader lastSeqReader = partiallyMockedLastSeqReader();
-
         String lastSeqInIndex = "1337";
         givenLastSeqInIndex(lastSeqInIndex);
 
@@ -47,8 +50,6 @@ public class LastSeqReaderTest {
     @Test
     public void shouldHandleNoLastSequence() throws Exception {
         // given
-        LastSeqReader lastSeqReader = partiallyMockedLastSeqReader();
-
         givenNoLastSeqInIndex();
 
         // when
@@ -58,21 +59,10 @@ public class LastSeqReaderTest {
         assertThat(result.isPresent()).isFalse();
     }
 
-    public LastSeqReader partiallyMockedLastSeqReader() {
-        return new LastSeqReader(dbConfig, riverConfig, client) {
-            @Override
-            void refreshIndex() {}
-
-            @Override
-            GetResponse doReadLastSeq() {
-                return mockedLastSeqResponse;
-            }
-        };
-    }
-
     private void givenLastSeqInIndex(String lastSeqInIndex) {
         given(dbConfig.getDatabase()).willReturn("database");
 
+        given(clientWrapper.read(anyString(), anyString(), anyString())).willReturn(mockedLastSeqResponse);
         given(mockedLastSeqResponse.isExists()).willReturn(true);
 
         Map<String, Object> lastSeq = newHashMap();

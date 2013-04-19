@@ -35,6 +35,7 @@ import org.elasticsearch.river.couchdb.kernel.index.LastSeqFormatter;
 import org.elasticsearch.river.couchdb.kernel.index.OnDeleteHook;
 import org.elasticsearch.river.couchdb.kernel.index.OnIndexHook;
 import org.elasticsearch.river.couchdb.kernel.index.RequestFactory;
+import org.elasticsearch.river.couchdb.kernel.shared.ClientWrapper;
 import org.elasticsearch.river.couchdb.kernel.slurp.ChangeHandler;
 import org.elasticsearch.river.couchdb.kernel.slurp.CouchdbHttpClient;
 import org.elasticsearch.river.couchdb.kernel.slurp.LastSeqReader;
@@ -54,7 +55,7 @@ import static org.elasticsearch.river.couchdb.util.Sleeper.sleepLong;
 
 public class CouchdbRiver extends AbstractRiverComponent implements River {
 
-    private final Client client;
+    private final ClientWrapper clientWrapper;
     private final ScriptService scriptService;
 
     private final IndexConfig indexConfig;
@@ -64,7 +65,7 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
 
     private List<Thread> threads = newArrayList();
     private volatile boolean closed;
-
+    
     private BlockingQueue<String> stream;
     private Slurper slurper;
     private Indexer indexer;
@@ -73,13 +74,14 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
     public CouchdbRiver(RiverName riverName, RiverSettings riverSettings, @RiverIndexName String riverIndexName,
                         Client client, ScriptService scriptService) {
         super(riverName, riverSettings);
-        this.client = client;
         this.scriptService = scriptService;
 
         indexConfig = IndexConfig.fromRiverSettings(riverSettings);
         connectionConfig = CouchdbConnectionConfig.fromRiverSettings(riverSettings);
         databaseConfig = CouchdbDatabaseConfig.fromRiverSettings(riverSettings);
         riverConfig = new RiverConfig(riverName, riverIndexName);
+
+        clientWrapper = new ClientWrapper(client);
     }
 
     @Override
@@ -112,7 +114,7 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
         for (int i = 1; i <= maxAttempts; ++i) {
             logger.info("Preparing index=[{}], attempt #{}.", indexConfig.getName(), i);
             try {
-                client.admin().indices().prepareCreate(indexConfig.getName()).execute().actionGet();
+                clientWrapper.createIndex(indexConfig.getName());
                 return;
             } catch (Exception e) {
                 Throwable cause = unwrapCause(e);
@@ -134,7 +136,7 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
         ChangeHandler changeHandler = new ChangeHandler(db, stream);
         CouchdbHttpClient couchdbHttpClient = new CouchdbHttpClient(db, connectionConfig, changeHandler);
         UrlBuilder urlBuilder = new UrlBuilder(connectionConfig, databaseConfig);
-        LastSeqReader lastSeqReader = new LastSeqReader(databaseConfig, riverConfig, client);
+        LastSeqReader lastSeqReader = new LastSeqReader(databaseConfig, riverConfig, clientWrapper);
         slurper = new Slurper(db, lastSeqReader, urlBuilder, couchdbHttpClient);
 
         ThreadFactory slurperFactory = daemonThreadFactory(settings.globalSettings(), "couchdb_river_slurper");
@@ -150,7 +152,7 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
         ChangeProcessor changeProcessor = new ChangeProcessor(db, script, indexConfig, onIndexHook, onDeleteHook);
         ChangeCollector changeCollector = new ChangeCollector(stream, indexConfig, changeProcessor);
         LastSeqFormatter lastSeqFormatter = new LastSeqFormatter(db);
-        indexer = new Indexer(db, changeCollector, client, lastSeqFormatter, requestFactory);
+        indexer = new Indexer(db, changeCollector, clientWrapper, lastSeqFormatter, requestFactory);
 
         ThreadFactory indexerFactory = daemonThreadFactory(settings.globalSettings(), "couchdb_river_indexer");
         threads.add(indexerFactory.newThread(indexer));
