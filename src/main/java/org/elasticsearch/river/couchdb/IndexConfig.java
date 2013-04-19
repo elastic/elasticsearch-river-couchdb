@@ -43,7 +43,7 @@ public class IndexConfig {
                 cfg.bulkTimeout = parseTimeValue(nodeStringValue(indexSettings.get(BULK_TIMEOUT), null), DEFAULT_BULK_TIMEOUT);
             }
             cfg.throttleSize = nodeIntegerValue(indexSettings.get(THROTTLE_SIZE), DEFAULT_THROTTLE_SIZE);
-            cfg.ignoreAttachments = nodeBooleanValue(indexSettings.get(IGNORE_ATTACHMENTS));
+            cfg.ignoreAttachments = nodeBooleanValue(indexSettings.get(IGNORE_ATTACHMENTS), true);
         }
         return cfg;
     }

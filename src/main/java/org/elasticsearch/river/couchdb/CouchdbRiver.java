@@ -132,7 +132,7 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
 
     private void prepareSlurper(String db) {
         ChangeHandler changeHandler = new ChangeHandler(db, stream);
-        CouchdbHttpClient couchdbHttpClient = new CouchdbHttpClient(null, connectionConfig, changeHandler);
+        CouchdbHttpClient couchdbHttpClient = new CouchdbHttpClient(db, connectionConfig, changeHandler);
         UrlBuilder urlBuilder = new UrlBuilder(connectionConfig, databaseConfig);
         LastSeqReader lastSeqReader = new LastSeqReader(databaseConfig, riverConfig, client);
         slurper = new Slurper(db, lastSeqReader, urlBuilder, couchdbHttpClient);

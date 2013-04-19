@@ -33,7 +33,7 @@ public class CouchdbConnectionConfig {
             Map<String, Object> couchdbConnection = (Map<String, Object>) riverSettings.settings().get(COUCHDB_CONNECTION);
 
             cfg.url = asUrl(nodeStringValue(couchdbConnection.get(URL), DEFAULT_URL));
-            cfg.noVerify = nodeBooleanValue(couchdbConnection.get(NO_VERIFY));
+            cfg.noVerify = nodeBooleanValue(couchdbConnection.get(NO_VERIFY), false);
 
             if (couchdbConnection.containsKey(USERNAME)) {
                 cfg.username = nodeStringValue(couchdbConnection.get(USERNAME), null);

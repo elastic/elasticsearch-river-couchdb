@@ -5,6 +5,7 @@ import static org.elasticsearch.common.xcontent.support.XContentMapValues.nodeBo
 import static org.elasticsearch.common.xcontent.support.XContentMapValues.nodeStringValue;
 import static org.elasticsearch.river.couchdb.util.Helpers.asUrlParam;
 import java.util.Map;
+import org.elasticsearch.common.Nullable;
 import org.elasticsearch.river.RiverSettings;
 import org.elasticsearch.script.ExecutableScript;
 import org.elasticsearch.script.ScriptService;
@@ -73,8 +74,13 @@ public class CouchdbDatabaseConfig {
     public boolean shouldUseScript() {
         return script != null;
     }
-    
+
+    @Nullable
     public ExecutableScript getScript(ScriptService scriptService) {
-        return scriptService.executable(scriptType, script, newHashMap());
+        if (shouldUseScript()) {
+            return scriptService.executable(scriptType, script, newHashMap());
+        } else {
+            return null;
+        }
     }
 }
