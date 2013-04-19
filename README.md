@@ -29,7 +29,8 @@ The CouchDB River allows to automatically index couchdb and make it searchable u
 	        "index" : "my_db",
 	        "type" : "my_db",
 	        "bulk_size" : "100",
-	        "bulk_timeout" : "10ms"
+	        "bulk_timeout" : "10ms",
+	        "ignore_attachments" : true
 	    }
 	}'
 
@@ -50,6 +51,7 @@ Filtering
 The `changes` stream allows to provide a filter with parameters that will be used by couchdb to filter the stream of changes. Here is how it can be configured:
 
 	{
+	    "type" : "couchdb",
 	    "couchdb_database" : {
 	        "filter" : "test",
 	        "filter_params" : {
@@ -116,10 +118,10 @@ You can ignore attachments as provided by couchDb for each document (`_attachmen
 Here is an example setting that disable *attachments* for all docs:
 
 	{
-	  "type":"couchdb",
-	  "couchdb_database": {
-	    "ignore_attachments":true
-	  }
+	    "type":"couchdb",
+	    "couchdb_database": {
+	        "ignore_attachments":true
+	    }
 	}
 
 Note, by default, attachments are not ignored (**false**)
