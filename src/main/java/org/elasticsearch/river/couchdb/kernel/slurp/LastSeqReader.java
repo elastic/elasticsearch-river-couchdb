@@ -2,6 +2,7 @@ package org.elasticsearch.river.couchdb.kernel.slurp;
 
 import static org.elasticsearch.common.base.Optional.absent;
 import static org.elasticsearch.common.base.Optional.fromNullable;
+import static org.elasticsearch.river.couchdb.kernel.shared.Constants.LAST_SEQ;
 import static org.elasticsearch.river.couchdb.util.LoggerHelper.slurperLogger;
 import org.elasticsearch.action.get.GetResponse;
 import org.elasticsearch.client.Client;
@@ -13,8 +14,6 @@ import org.elasticsearch.river.couchdb.RiverConfig;
 import java.util.Map;
 
 public class LastSeqReader {
-
-    public static final String LAST_SEQ = "last_seq";
 
     private final ESLogger logger;
 
@@ -53,7 +52,7 @@ public class LastSeqReader {
     @VisibleForTesting
     GetResponse doReadLastSeq() {
         return client.prepareGet(riverConfig.getRiverIndexName(),
-                riverConfig.getRiverName().name(), "_seq").execute().actionGet();
+                riverConfig.getRiverName().name(), LAST_SEQ).execute().actionGet();
     }
 
     private String parseLastSeq(GetResponse lastSeqResponse) {

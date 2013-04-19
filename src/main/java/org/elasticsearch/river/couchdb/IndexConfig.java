@@ -12,7 +12,7 @@ import java.util.Map;
 public class IndexConfig {
 
     public static final String INDEX = "index";
-    public static final String NAME = "index";
+    public static final String NAME = "name";
     public static final String TYPE = "type";
     public static final String THROTTLE_SIZE = "throttle_size";
     public static final String BULK_TIMEOUT = "bulk_timeout";

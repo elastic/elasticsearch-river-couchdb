@@ -2,7 +2,7 @@ package org.elasticsearch.river.couchdb.kernel.index;
 
 import static org.elasticsearch.common.base.Throwables.propagate;
 import static org.elasticsearch.common.xcontent.XContentFactory.jsonBuilder;
-import static org.elasticsearch.river.couchdb.kernel.index.Indexer.LAST_SEQ;
+import static org.elasticsearch.river.couchdb.kernel.shared.Constants.LAST_SEQ;
 import static org.elasticsearch.river.couchdb.util.LoggerHelper.indexerLogger;
 import org.elasticsearch.common.Nullable;
 import org.elasticsearch.common.logging.ESLogger;

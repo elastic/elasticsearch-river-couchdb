@@ -1,6 +1,7 @@
 package org.elasticsearch.river.couchdb.kernel.index;
 
 import static org.elasticsearch.common.base.Optional.fromNullable;
+import static org.elasticsearch.river.couchdb.kernel.shared.Constants.LAST_SEQ;
 import static org.elasticsearch.river.couchdb.util.LoggerHelper.indexerLogger;
 import static org.elasticsearch.river.couchdb.util.Sleeper.sleepLong;
 import org.elasticsearch.ElasticSearchException;
@@ -12,8 +13,6 @@ import org.elasticsearch.common.base.Optional;
 import org.elasticsearch.common.logging.ESLogger;
 
 public class Indexer implements Runnable {
-
-    public static final String LAST_SEQ = "last_seq";
 
     private final ESLogger logger;
 

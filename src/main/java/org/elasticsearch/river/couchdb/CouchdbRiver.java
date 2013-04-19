@@ -79,7 +79,7 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
         indexConfig = IndexConfig.fromRiverSettings(riverSettings);
         connectionConfig = CouchdbConnectionConfig.fromRiverSettings(riverSettings);
         databaseConfig = CouchdbDatabaseConfig.fromRiverSettings(riverSettings);
-        riverConfig = new RiverConfig(riverName, riverSettings, riverIndexName);
+        riverConfig = new RiverConfig(riverName, riverIndexName);
     }
 
     @Override

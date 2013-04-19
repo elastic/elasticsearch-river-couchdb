@@ -4,7 +4,7 @@ import static org.elasticsearch.client.Requests.deleteRequest;
 import static org.elasticsearch.client.Requests.indexRequest;
 import static org.elasticsearch.common.base.Throwables.propagate;
 import static org.elasticsearch.common.xcontent.XContentFactory.jsonBuilder;
-import static org.elasticsearch.river.couchdb.kernel.index.Indexer.LAST_SEQ;
+import static org.elasticsearch.river.couchdb.kernel.shared.Constants.LAST_SEQ;
 import static org.elasticsearch.river.couchdb.util.LoggerHelper.indexerLogger;
 import org.elasticsearch.action.delete.DeleteRequest;
 import org.elasticsearch.action.index.IndexRequest;
@@ -33,7 +33,7 @@ public class RequestFactory {
 
         return indexRequest(riverConfig.getRiverIndexName())
                 .type(riverConfig.getRiverName().name())
-                .id("_seq")
+                .id(LAST_SEQ)
                 .source(lastSeqSource(lastSeq));
     }
 
