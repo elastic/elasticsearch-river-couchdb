@@ -17,10 +17,10 @@ public class ChangeHandler {
 
     public void handleChange(String change) throws InterruptedException {
         if (change.isEmpty()) {
-            logger.trace("Received a heartbeat from CouchDB.");
+            logger.debug("Received a heartbeat from CouchDB.");
             return;
         }
-        logger.trace("Received an update=[{}].", change);
+        logger.debug("Received an update=[{}].", change);
 
         changesQueue.put(change);
     }

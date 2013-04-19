@@ -59,10 +59,11 @@ public class Indexer implements Runnable {
 
         Object rawLastSeq = changeCollector.collectAndProcessChanges(bulk);
         String lastSeq = lastSeqFormatter.format(rawLastSeq);
+        logger.debug("Received and processed a change with {}=[{}]", LAST_SEQ, lastSeq);
 
         if (lastSeq != null) {
             bulk.add(requestFactory.aRequestToUpdateLastSeq(lastSeq));
-            logger.debug("Will update {} to [{}].", LAST_SEQ, lastSeq);
+            logger.info("Will update {} to [{}].", LAST_SEQ, lastSeq);
         }
 
         if (bulk.numberOfActions() > 0) {

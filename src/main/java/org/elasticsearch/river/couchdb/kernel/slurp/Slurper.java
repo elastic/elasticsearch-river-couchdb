@@ -1,6 +1,5 @@
 package org.elasticsearch.river.couchdb.kernel.slurp;
 
-import static org.elasticsearch.river.couchdb.kernel.shared.Constants.LAST_SEQ;
 import static org.elasticsearch.river.couchdb.util.LoggerHelper.slurperLogger;
 import static org.elasticsearch.river.couchdb.util.Sleeper.sleepLong;
 import org.elasticsearch.common.annotations.VisibleForTesting;
@@ -45,11 +44,10 @@ public class Slurper implements Runnable {
     @VisibleForTesting
     void slurp() throws InterruptedException {
         Optional<String> lastSeq = lastSeqReader.readLastSequenceFromIndex();
-        logger.info("Read {}=[{}] from index.", LAST_SEQ, lastSeq);
         changesFeedUrlBuilder.withLastSeq(lastSeq);
 
         URL changesFeedUrl = changesFeedUrlBuilder.build();
-        logger.debug("Will use changes' feed URL=[{}].", changesFeedUrl);
+        logger.info("Will use changes' feed URL=[{}].", changesFeedUrl);
 
         couchdbHttpClient.listenForChanges(changesFeedUrl);
     }

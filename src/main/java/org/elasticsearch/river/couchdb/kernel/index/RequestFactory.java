@@ -29,8 +29,6 @@ public class RequestFactory {
     }
 
     public IndexRequest aRequestToUpdateLastSeq(String lastSeq) {
-        logger.debug("Will update {} to [{}].", LAST_SEQ, lastSeq);
-
         return indexRequest(riverConfig.getRiverIndexName())
                 .type(riverConfig.getRiverName().name())
                 .id(LAST_SEQ)

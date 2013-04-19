@@ -36,6 +36,7 @@ public class CouchdbHttpClient {
             connection = configureConnection(changesFeedUrl);
 
             reader = bufferedUtf8ReaderFor(connectAndExtractStream(connection));
+            logger.info("Established connection to url=[{}].", changesFeedUrl);
 
             blockingReadFromConnection(reader);
 

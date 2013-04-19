@@ -37,7 +37,7 @@ public class LastSeqReader {
 
         if (lastSeqResponse.isExists()) {
             String lastSeq = parseLastSeq(lastSeqResponse);
-            logger.info("Read {}=[{}] in index.", LAST_SEQ, lastSeq);
+            logger.info("Read {}=[{}] from index.", LAST_SEQ, lastSeq);
             return fromNullable(lastSeq);
         }
         logger.info("No {} value found in index.", LAST_SEQ);
