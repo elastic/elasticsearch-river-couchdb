@@ -1,7 +1,7 @@
 package org.elasticsearch.river.couchdb.kernel.slurp;
 
 import static org.elasticsearch.river.couchdb.util.LoggerHelper.slurperLogger;
-import static org.elasticsearch.river.couchdb.util.Sleeper.sleepLong;
+import static org.elasticsearch.river.couchdb.util.Sleeper.sleep;
 import org.elasticsearch.common.annotations.VisibleForTesting;
 import org.elasticsearch.common.base.Optional;
 import org.elasticsearch.common.logging.ESLogger;
@@ -35,7 +35,7 @@ public class Slurper implements Runnable {
                 close();
             } catch (Exception e) {
                 logger.warn("Unhandled error, throttling.", e);
-                sleepLong("to avoid log flooding");
+                sleep("to avoid log flooding");
             }
         }
         logger.info("Closed.");

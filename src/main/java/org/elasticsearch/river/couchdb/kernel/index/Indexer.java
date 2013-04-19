@@ -3,7 +3,7 @@ package org.elasticsearch.river.couchdb.kernel.index;
 import static org.elasticsearch.common.base.Optional.fromNullable;
 import static org.elasticsearch.river.couchdb.kernel.shared.Constants.LAST_SEQ;
 import static org.elasticsearch.river.couchdb.util.LoggerHelper.indexerLogger;
-import static org.elasticsearch.river.couchdb.util.Sleeper.sleepLong;
+import static org.elasticsearch.river.couchdb.util.Sleeper.sleep;
 import org.elasticsearch.ElasticSearchException;
 import org.elasticsearch.action.bulk.BulkRequestBuilder;
 import org.elasticsearch.action.bulk.BulkResponse;
@@ -47,7 +47,7 @@ public class Indexer implements Runnable {
                 logger.warn("Failed to execute bulk request.", bre);
             } catch (Exception e) {
                 logger.error("Unhandled error.", e);
-                sleepLong("to avoid log flooding");
+                sleep("to avoid log flooding");
             }
         }
         logger.info("Closed.");

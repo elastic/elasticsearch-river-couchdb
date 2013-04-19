@@ -2,8 +2,7 @@ package org.elasticsearch.river.couchdb.util;
 
 public final class Sleeper {
 
-    private static final long DEFAULT = 1000L;
-    private static final long ON_ERROR = 10000L;
+    private static final long NAP_DURATION = 10000L;
 
     private Sleeper() {}
 
@@ -14,10 +13,6 @@ public final class Sleeper {
     }
 
     public static void sleep(String why) {
-        sleep(DEFAULT);
-    }
-
-    public static void sleepLong(String why) {
-        sleep(ON_ERROR);
+        sleep(NAP_DURATION);
     }
 }

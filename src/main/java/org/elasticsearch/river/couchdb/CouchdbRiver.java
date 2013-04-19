@@ -50,7 +50,7 @@ import static org.elasticsearch.ExceptionsHelper.unwrapCause;
 import static org.elasticsearch.common.base.Throwables.propagate;
 import static org.elasticsearch.common.collect.Lists.newArrayList;
 import static org.elasticsearch.common.util.concurrent.EsExecutors.daemonThreadFactory;
-import static org.elasticsearch.river.couchdb.util.Sleeper.sleepLong;
+import static org.elasticsearch.river.couchdb.util.Sleeper.sleep;
 
 public class CouchdbRiver extends AbstractRiverComponent implements River {
 
@@ -112,7 +112,7 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
                     return;
                 } else if (cause instanceof ClusterBlockException) {
                     logger.warn("Cluster not recovered yet. Retrying...");
-                    sleepLong("to give the cluster some time to recover.");
+                    sleep("to give the cluster some time to recover.");
                 } else {
                     logger.error("Failed to create index=[{}]. River will be disabled.", e, indexConfig.getName());
                     propagate(e);

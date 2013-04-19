@@ -22,9 +22,6 @@ package org.elasticsearch.river.couchdb;
 import org.elasticsearch.common.inject.AbstractModule;
 import org.elasticsearch.river.River;
 
-/**
- *
- */
 public class CouchdbRiverModule extends AbstractModule {
 
     @Override
