@@ -46,7 +46,6 @@ import org.elasticsearch.script.ScriptService;
 import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.ThreadFactory;
 import static org.elasticsearch.ExceptionsHelper.unwrapCause;
 import static org.elasticsearch.common.base.Throwables.propagate;
 import static org.elasticsearch.common.collect.Lists.newArrayList;
@@ -64,11 +63,6 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
     private final RiverConfig riverConfig;
 
     private List<Thread> threads = newArrayList();
-    private volatile boolean closed;
-
-    private BlockingQueue<String> stream;
-    private Slurper slurper;
-    private Indexer indexer;
 
     @Inject
     public CouchdbRiver(RiverName riverName, RiverSettings riverSettings, @RiverIndexName String riverIndexName,
@@ -86,28 +80,19 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
 
     @Override
     public void start() {
-        initializeStream();
-
         initializeIndex();
 
         String db = databaseConfig.getDatabase();
+        BlockingQueue<String> changesStream = initializeStream();
 
-        slurper = prepareSlurper(db);
+        Slurper slurper = prepareSlurper(db, changesStream);
         threads.add(createThread("couchdb_river_slurper", slurper));
 
-        indexer = prepareIndexer(db);
+        Indexer indexer = prepareIndexer(db, changesStream);
         threads.add(createThread("couchdb_river_indexer", indexer));
 
         for (Thread thread : threads) {
             thread.start();
-        }
-    }
-
-    public void initializeStream() {
-        if (indexConfig.getThrottleSize() > 0) {
-            stream = new ArrayBlockingQueue<String>(indexConfig.getThrottleSize());
-        } else {
-            stream = new LinkedTransferQueue<String>();
         }
     }
 
@@ -136,11 +121,15 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
         }
     }
 
-    private Thread createThread(String namePrefix, Runnable runnable) {
-        return daemonThreadFactory(settings.globalSettings(), namePrefix).newThread(runnable);
+    public BlockingQueue<String> initializeStream() {
+        if (indexConfig.getThrottleSize() > 0) {
+            return new ArrayBlockingQueue<String>(indexConfig.getThrottleSize());
+        } else {
+            return new LinkedTransferQueue<String>();
+        }
     }
 
-    private Slurper prepareSlurper(String db) {
+    private Slurper prepareSlurper(String db, BlockingQueue<String> stream) {
         ChangeHandler changeHandler = new ChangeHandler(db, stream);
         CouchdbHttpClient couchdbHttpClient = new CouchdbHttpClient(db, connectionConfig, changeHandler);
         UrlBuilder urlBuilder = new UrlBuilder(connectionConfig, databaseConfig);
@@ -148,7 +137,7 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
         return new Slurper(db, lastSeqReader, urlBuilder, couchdbHttpClient);
     }
 
-    private Indexer prepareIndexer(String db) {
+    private Indexer prepareIndexer(String db, BlockingQueue<String> stream) {
         RequestFactory requestFactory = new RequestFactory(db, riverConfig);
         DocumentHelper documentHelper = new DocumentHelper(indexConfig);
         OnDeleteHook onDeleteHook = new DefaultOnDeleteHook(db, requestFactory, documentHelper);
@@ -160,16 +149,15 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
         return new Indexer(db, changeCollector, clientWrapper, lastSeqFormatter, requestFactory);
     }
 
+    private Thread createThread(String namePrefix, Runnable runnable) {
+        return daemonThreadFactory(settings.globalSettings(), namePrefix).newThread(runnable);
+    }
+
     @Override
     public void close() {
-        if (!closed) {
-            logger.info("Closing CouchDB river.");
-            closed = true;
-            slurper.close();
-            indexer.close();
-            for (Thread thread : threads) {
-                thread.interrupt();
-            }
+        logger.info("Closing CouchDB river.");
+        for (Thread thread : threads) {
+            thread.interrupt();
         }
     }
 }
