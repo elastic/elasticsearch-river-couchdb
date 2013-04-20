@@ -10,6 +10,7 @@ import org.elasticsearch.action.bulk.BulkResponse;
 import org.elasticsearch.common.annotations.VisibleForTesting;
 import org.elasticsearch.common.base.Optional;
 import org.elasticsearch.common.logging.ESLogger;
+import org.elasticsearch.rest.RestStatus;
 import org.elasticsearch.river.couchdb.kernel.shared.ClientWrapper;
 
 public class Indexer implements Runnable {
@@ -25,7 +26,8 @@ public class Indexer implements Runnable {
     private volatile boolean closed;
 
     public Indexer(String database, ChangeCollector changeCollector, ClientWrapper clientWrapper,
-                   LastSeqFormatter lastSeqFormatter, RequestFactory requestFactory, RetryHandler retryHandler) {
+                   LastSeqFormatter lastSeqFormatter, RequestFactory requestFactory,
+                   RetryHandler<IndexCommand> retryHandler) {
         this.changeCollector = changeCollector;
         this.clientWrapper = clientWrapper;
         this.lastSeqFormatter = lastSeqFormatter;
@@ -53,8 +55,16 @@ public class Indexer implements Runnable {
             retryHandler.doNotRetry();
         } catch (InterruptedException ie) {
             close();
+        } catch (BulkConflictException bce) {
+            logger.debug("Index conflict while executing bulk request. Will retry.", bce);
+            sleep("to avoid log flooding");
         } catch (BulkRequestException bre) {
-            logger.warn("Failed to execute bulk request.", bre);
+            if (bre.isRecoverable()) {
+                logger.info("Failed to execute bulk request. Will retry.", bre);
+            } else {
+                logger.error("Failed to execute bulk request. Will not retry.", bre);
+                retryHandler.doNotRetry();
+            }
         } catch (Exception e) {
             retryHandler.doNotRetry();
             logger.error("Unhandled error.", e);
@@ -99,7 +109,11 @@ public class Indexer implements Runnable {
                 throw new BulkRequestException(response.buildFailureMessage());
             }
         } catch (ElasticSearchException ese) {
-            throw new BulkRequestException(ese);
+            if (ese.status() == RestStatus.CONFLICT) {
+                throw new BulkConflictException(ese);
+            } else {
+                throw new BulkRequestException(ese);
+            }
         }
     }
 
