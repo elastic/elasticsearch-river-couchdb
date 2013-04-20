@@ -23,6 +23,8 @@ public class Indexer implements Runnable {
 
     private volatile boolean closed;
 
+    private IndexOperation previousOperation;
+
     public Indexer(String database, ChangeCollector changeCollector, ClientWrapper clientWrapper,
                    LastSeqFormatter lastSeqFormatter, RequestFactory requestFactory) {
         this.changeCollector = changeCollector;
@@ -41,6 +43,7 @@ public class Indexer implements Runnable {
                 if (indexedSeq.isPresent()) {
                     logger.debug("Succeeded to index change with seq=[{}].", indexedSeq.get());
                 }
+                previousOperation = null;
             } catch (InterruptedException ie) {
                 close();
             } catch (BulkRequestException bre) {
@@ -55,21 +58,28 @@ public class Indexer implements Runnable {
 
     @VisibleForTesting
     Optional<String> index() throws InterruptedException {
-        BulkRequestBuilder bulk = clientWrapper.prepareBulkRequest();
+        IndexOperation op;
 
-        Object rawLastSeq = changeCollector.collectAndProcessChanges(bulk);
-        String lastSeq = lastSeqFormatter.format(rawLastSeq);
-        logger.debug("Received and processed a change with {}=[{}]", LAST_SEQ, lastSeq);
+        if (previousOperation == null) {
+            BulkRequestBuilder bulk = clientWrapper.prepareBulkRequest();
 
-        if (lastSeq != null) {
-            bulk.add(requestFactory.aRequestToUpdateLastSeq(lastSeq));
-            logger.info("Will update {} to [{}].", LAST_SEQ, lastSeq);
+            Object rawLastSeq = changeCollector.collectAndProcessChanges(bulk);
+            String lastSeq = lastSeqFormatter.format(rawLastSeq);
+            logger.debug("Received and processed a change with {}=[{}]", LAST_SEQ, lastSeq);
+
+            if (lastSeq != null) {
+                bulk.add(requestFactory.aRequestToUpdateLastSeq(lastSeq));
+                logger.info("Will update {} to [{}].", LAST_SEQ, lastSeq);
+            }
+            op = new IndexOperation(bulk, lastSeq);
+        } else {
+            op = previousOperation;
         }
 
-        if (bulk.numberOfActions() > 0) {
-            executeBulkRequest(bulk);
+        if (op.getBulk().numberOfActions() > 0) {
+            executeBulkRequest(op.getBulk());
         }
-        return fromNullable(lastSeq);
+        return fromNullable(op.getLastSeq());
     }
 
     private void executeBulkRequest(BulkRequestBuilder bulk) {
