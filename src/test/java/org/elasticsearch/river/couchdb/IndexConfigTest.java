@@ -40,9 +40,9 @@ public class IndexConfigTest {
         assertThat(cfg.getName()).isEqualTo(testName);
         assertThat(cfg.getType()).isEqualTo(testType);
         assertThat(cfg.getBulkSize()).isEqualTo(testBulkSize);
-        assertThat(cfg.getBulkTimeout()).isEqualTo(testBulkTimeout);
+        assertThat(cfg.getBulkTimeout().millis()).isEqualTo(testBulkTimeout.millis());
         assertThat(cfg.getThrottleSize()).isEqualTo(testThrottleSize);
-        assertThat(cfg.shouldIgnoreAttachments()).isFalse();
+        assertThat(cfg.shouldIgnoreAttachments()).isTrue();
     }
 
     @Test
