@@ -2,11 +2,11 @@ package org.elasticsearch.river.couchdb.kernel.index;
 
 import org.elasticsearch.action.bulk.BulkRequestBuilder;
 
-public class IndexOperation {
+public class IndexCommand {
     private final BulkRequestBuilder bulk;
     private final String lastSeq;
 
-    public IndexOperation(BulkRequestBuilder bulk, String lastSeq) {
+    public IndexCommand(BulkRequestBuilder bulk, String lastSeq) {
         this.bulk = bulk;
         this.lastSeq = lastSeq;
     }

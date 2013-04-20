@@ -7,16 +7,14 @@ import static org.mockito.Matchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
-import org.elasticsearch.action.ListenableActionFuture;
 import org.elasticsearch.action.bulk.BulkRequestBuilder;
 import org.elasticsearch.action.bulk.BulkResponse;
 import org.elasticsearch.action.index.IndexRequest;
-import org.elasticsearch.client.Client;
 import org.elasticsearch.common.base.Optional;
+import org.elasticsearch.river.couchdb.kernel.shared.ClientWrapper;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.runners.MockitoJUnitRunner;
 
@@ -26,7 +24,7 @@ public class IndexerTest {
     @Mock
     private ChangeCollector changeCollector;
     @Mock
-    private Client client;
+    private ClientWrapper clientWrapper;
     @Mock
     private LastSeqFormatter lastSeqFormatter;
     @Mock
@@ -34,12 +32,15 @@ public class IndexerTest {
     @Mock
     private BulkRequestBuilder bulk;
 
-    @InjectMocks
+    private RetryHandler<IndexCommand> retryHandler = new RetryHandler<IndexCommand>();
+
     private Indexer indexer;
 
     @Before
     public void initMocks() {
-        given(client.prepareBulk()).willReturn(bulk);
+        indexer = new Indexer("db", changeCollector, clientWrapper, lastSeqFormatter, requestFactory, retryHandler);
+
+        given(clientWrapper.prepareBulkRequest()).willReturn(bulk);
 
         given(lastSeqFormatter.format(anyString())).willCallRealMethod();
     }
@@ -58,7 +59,6 @@ public class IndexerTest {
 
         // and given
         given(bulk.numberOfActions()).willReturn(1);
-        givenBulkExecuted();
 
         // then
         assertThat(indexedSeq.get()).isEqualTo(seq);
@@ -83,15 +83,38 @@ public class IndexerTest {
         assertThat(indexedSeq.isPresent()).isFalse();
     }
 
-    private void givenReceivedChangeYieldsLastSeqEqualTo(String seq) throws Exception {
-        given(changeCollector.collectAndProcessChanges(bulk)).willReturn(seq);
+    @SuppressWarnings("unchecked")
+    @Test
+    public void shouldRetryAFailedRequest() throws Exception {
+        // given
+        givenReceivedChangeYieldsLastSeqEqualTo("1337");
+
+        given(clientWrapper.executeBulkRequest(bulk))
+                .willThrow(BulkRequestException.class) // first attempt fails
+                .willReturn(okBulkResponse()); // second attempt succeeds
+
+        given(bulk.numberOfActions()).willReturn(1);
+
+        // when
+        indexer.singleIteration();
+
+        // then
+        assertThat(retryHandler.shouldRetryLastAttempt()).isTrue();
+
+        // when
+        indexer.singleIteration();
+
+        // then
+        assertThat(retryHandler.shouldRetryLastAttempt()).isFalse();
     }
 
-    @SuppressWarnings("unchecked")
-    private void givenBulkExecuted() {
-        ListenableActionFuture future = mock(ListenableActionFuture.class);
-        given(bulk.execute()).willReturn(future);
-        BulkResponse bulkResponse = mock(BulkResponse.class);
-        given(future.actionGet()).willReturn(bulkResponse);
+    private BulkResponse okBulkResponse() {
+        BulkResponse okBulkResponse = mock(BulkResponse.class);
+        given(okBulkResponse.hasFailures()).willReturn(false);
+        return okBulkResponse;
+    }
+
+    private void givenReceivedChangeYieldsLastSeqEqualTo(String seq) throws Exception {
+        given(changeCollector.collectAndProcessChanges(bulk)).willReturn(seq);
     }
 }

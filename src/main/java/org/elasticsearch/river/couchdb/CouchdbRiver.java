@@ -30,11 +30,13 @@ import org.elasticsearch.river.couchdb.kernel.index.ChangeProcessor;
 import org.elasticsearch.river.couchdb.kernel.index.DefaultOnDeleteHook;
 import org.elasticsearch.river.couchdb.kernel.index.DefaultOnIndexHook;
 import org.elasticsearch.river.couchdb.kernel.index.DocumentHelper;
+import org.elasticsearch.river.couchdb.kernel.index.IndexCommand;
 import org.elasticsearch.river.couchdb.kernel.index.Indexer;
 import org.elasticsearch.river.couchdb.kernel.index.LastSeqFormatter;
 import org.elasticsearch.river.couchdb.kernel.index.OnDeleteHook;
 import org.elasticsearch.river.couchdb.kernel.index.OnIndexHook;
 import org.elasticsearch.river.couchdb.kernel.index.RequestFactory;
+import org.elasticsearch.river.couchdb.kernel.index.RetryHandler;
 import org.elasticsearch.river.couchdb.kernel.shared.ClientWrapper;
 import org.elasticsearch.river.couchdb.kernel.slurp.ChangeHandler;
 import org.elasticsearch.river.couchdb.kernel.slurp.CouchdbHttpClient;
@@ -146,7 +148,8 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
         ChangeProcessor changeProcessor = new ChangeProcessor(db, script, indexConfig, onIndexHook, onDeleteHook);
         ChangeCollector changeCollector = new ChangeCollector(stream, indexConfig, changeProcessor);
         LastSeqFormatter lastSeqFormatter = new LastSeqFormatter(db);
-        return new Indexer(db, changeCollector, clientWrapper, lastSeqFormatter, requestFactory);
+        RetryHandler<IndexCommand> retryHandler = new RetryHandler<IndexCommand>();
+        return new Indexer(db, changeCollector, clientWrapper, lastSeqFormatter, requestFactory, retryHandler);
     }
 
     private Thread createThread(String namePrefix, Runnable runnable) {

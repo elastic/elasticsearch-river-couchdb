@@ -20,17 +20,17 @@ public class Indexer implements Runnable {
     private final ClientWrapper clientWrapper;
     private final LastSeqFormatter lastSeqFormatter;
     private final RequestFactory requestFactory;
+    private final RetryHandler<IndexCommand> retryHandler;
 
     private volatile boolean closed;
 
-    private IndexOperation previousOperation;
-
     public Indexer(String database, ChangeCollector changeCollector, ClientWrapper clientWrapper,
-                   LastSeqFormatter lastSeqFormatter, RequestFactory requestFactory) {
+                   LastSeqFormatter lastSeqFormatter, RequestFactory requestFactory, RetryHandler retryHandler) {
         this.changeCollector = changeCollector;
         this.clientWrapper = clientWrapper;
         this.lastSeqFormatter = lastSeqFormatter;
         this.requestFactory = requestFactory;
+        this.retryHandler = retryHandler;
 
         logger = indexerLogger(Indexer.class, database);
     }
@@ -38,48 +38,58 @@ public class Indexer implements Runnable {
     @Override
     public void run() {
         while (!closed) {
-            try {
-                Optional<String> indexedSeq = index();
-                if (indexedSeq.isPresent()) {
-                    logger.debug("Succeeded to index change with seq=[{}].", indexedSeq.get());
-                }
-                previousOperation = null;
-            } catch (InterruptedException ie) {
-                close();
-            } catch (BulkRequestException bre) {
-                logger.warn("Failed to execute bulk request.", bre);
-            } catch (Exception e) {
-                logger.error("Unhandled error.", e);
-                sleep("to avoid log flooding");
-            }
+            singleIteration();
         }
         logger.info("Closed.");
     }
 
     @VisibleForTesting
-    Optional<String> index() throws InterruptedException {
-        IndexOperation op;
-
-        if (previousOperation == null) {
-            BulkRequestBuilder bulk = clientWrapper.prepareBulkRequest();
-
-            Object rawLastSeq = changeCollector.collectAndProcessChanges(bulk);
-            String lastSeq = lastSeqFormatter.format(rawLastSeq);
-            logger.debug("Received and processed a change with {}=[{}]", LAST_SEQ, lastSeq);
-
-            if (lastSeq != null) {
-                bulk.add(requestFactory.aRequestToUpdateLastSeq(lastSeq));
-                logger.info("Will update {} to [{}].", LAST_SEQ, lastSeq);
+    void singleIteration() {
+        try {
+            Optional<String> indexedSeq = index();
+            if (indexedSeq.isPresent()) {
+                logger.debug("Succeeded to index change with seq=[{}].", indexedSeq.get());
             }
-            op = new IndexOperation(bulk, lastSeq);
+            retryHandler.doNotRetry();
+        } catch (InterruptedException ie) {
+            close();
+        } catch (BulkRequestException bre) {
+            logger.warn("Failed to execute bulk request.", bre);
+        } catch (Exception e) {
+            retryHandler.doNotRetry();
+            logger.error("Unhandled error.", e);
+            sleep("to avoid log flooding");
+        }
+    }
+
+    @VisibleForTesting
+    Optional<String> index() throws InterruptedException {
+        IndexCommand cmd;
+        if (retryHandler.shouldRetryLastAttempt()) {
+            cmd = retryHandler.getLastCommand();
         } else {
-            op = previousOperation;
+            cmd = prepareANewIndexOperation();
+            retryHandler.newCommand(cmd);
         }
 
-        if (op.getBulk().numberOfActions() > 0) {
-            executeBulkRequest(op.getBulk());
+        if (cmd.getBulk().numberOfActions() > 0) {
+            executeBulkRequest(cmd.getBulk());
         }
-        return fromNullable(op.getLastSeq());
+        return fromNullable(cmd.getLastSeq());
+    }
+
+    private IndexCommand prepareANewIndexOperation() throws InterruptedException {
+        BulkRequestBuilder bulk = clientWrapper.prepareBulkRequest();
+
+        Object rawLastSeq = changeCollector.collectAndProcessChanges(bulk);
+        String lastSeq = lastSeqFormatter.format(rawLastSeq);
+        logger.debug("Received and processed a change with {}=[{}]", LAST_SEQ, lastSeq);
+
+        if (lastSeq != null) {
+            bulk.add(requestFactory.aRequestToUpdateLastSeq(lastSeq));
+            logger.info("Will update {} to [{}].", LAST_SEQ, lastSeq);
+        }
+        return new IndexCommand(bulk, lastSeq);
     }
 
     private void executeBulkRequest(BulkRequestBuilder bulk) {
