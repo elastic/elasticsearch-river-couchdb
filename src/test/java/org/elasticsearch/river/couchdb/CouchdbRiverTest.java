@@ -17,16 +17,14 @@ public class CouchdbRiverTest {
 
     private Node node;
 
-    private String river = "_river";
-    private String type = "couchdb";
-    private String db = "db";
-    private String index = db;
+    private String dbName = "db";
+    private String indexName = dbName;
 
     private void run() throws Exception {
         node = nodeBuilder().settings(settingsBuilder().put("gateway.type", "local")).node();
 
-        delete(river);
-        delete(db);
+        delete("_river");
+        delete(indexName);
 
         try {
             node.client().prepareIndex("_river", "couchdb", "_meta").setSource(meta()).execute().actionGet();
@@ -39,10 +37,10 @@ public class CouchdbRiverTest {
 
     private XContentBuilder meta() throws IOException {
         return jsonBuilder().startObject()
-                    .field("type", type)
-                    .startObject("index").field("name", index).field("type", type).field("ignore_attachments", true).endObject()
+                    .field("type", "couchdb")
+                    .startObject("index").field("name", indexName).field("type", indexName).field("ignore_attachments", true).endObject()
                     .startObject("couchdb_connection").field("url", "http://localhost:5984").endObject()
-                    .startObject("couchdb_database").field("database", db).endObject()
+                    .startObject("couchdb_database").field("database", dbName).endObject()
                     .endObject();
     }
 
