@@ -19,17 +19,18 @@ The CouchDB River allows to automatically index couchdb and make it searchable u
 
 	curl -XPUT 'localhost:9200/_river/my_db/_meta' -d '{
 	    "type" : "couchdb",
-	    "couchdb" : {
-	        "host" : "localhost",
-	        "port" : 5984,
-	        "db" : "my_db",
-	        "filter" : null
+	    "couchdb_connection" : {
+	        "url" : "http://localhost:5984"
 	    },
+	    "couchdb_database" : {
+	        "database" : "my_db"
+	    }
 	    "index" : {
 	        "index" : "my_db",
 	        "type" : "my_db",
 	        "bulk_size" : "100",
-	        "bulk_timeout" : "10ms"
+	        "bulk_timeout" : "10ms",
+	        "ignore_attachments" : true
 	    }
 	}'
 
@@ -50,7 +51,8 @@ Filtering
 The `changes` stream allows to provide a filter with parameters that will be used by couchdb to filter the stream of changes. Here is how it can be configured:
 
 	{
-	    "couchdb" : {
+	    "type" : "couchdb",
+	    "couchdb_database" : {
 	        "filter" : "test",
 	        "filter_params" : {
 	            "param1" : "value1",
@@ -76,7 +78,7 @@ Here is an example setting that adds `field1` with value `value1` to all docs:
 
 	{
 	    "type" : "couchdb",
-	    "couchdb" : {
+	    "couchdb_database" : {
 	        "script" : "ctx.doc.field1 = 'value1'"
 	    }
 	}
@@ -84,12 +86,12 @@ Here is an example setting that adds `field1` with value `value1` to all docs:
 Basic Authentication
 ===============
 
-Basic Authentication can be used by passing the **user** and **password** attributes.
+Basic Authentication can be used by passing the **username** and **password** attributes.
 
 	{
 	    "type" : "couchdb",
-	    "couchdb" : {
-	        "user" : "alice",
+	    "couchdb_database" : {
+	        "username" : "alice",
 	        "password" : "secret"
 	    }
 	}
@@ -97,14 +99,13 @@ Basic Authentication can be used by passing the **user** and **password** attrib
 HTTPS
 =====
 
-To use HTTPS, pass the **protocol** field. Most likely, you will also have to change the **port**. If you have unfixable problems with the servers certificates for any reason, you can disable hostname verification by passing **no_verify**.
+To use HTTPS, simply change the url property accordingly. If you have unfixable problems with the servers certificates for any reason, you can disable hostname verification by passing **no_verify**.
 
 	{
 	    "type" : "couchdb",
-	    "couchdb" : {
-	        "protocol" : "https",
-	        "port" : 443,
-	        "no_verify" : "true"
+	    "couchdb_connection" : {
+	        "url" : "https://localhost:443",
+	        "no_verify" : true
 	    }
 	}
 
@@ -117,10 +118,10 @@ You can ignore attachments as provided by couchDb for each document (`_attachmen
 Here is an example setting that disable *attachments* for all docs:
 
 	{
-	  "type":"couchdb",
-	  "couchdb": {
-	    "ignore_attachments":true
-	  }
+	    "type":"couchdb",
+	    "couchdb_database": {
+	        "ignore_attachments":true
+	    }
 	}
 
 Note, by default, attachments are not ignored (**false**)

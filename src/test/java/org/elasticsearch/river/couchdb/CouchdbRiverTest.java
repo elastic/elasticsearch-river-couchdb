@@ -1,40 +1,54 @@
-/*
- * Licensed to ElasticSearch and Shay Banon under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership. ElasticSearch licenses this
- * file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- *
- *    http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
- * specific language governing permissions and limitations
- * under the License.
- */
-
 package org.elasticsearch.river.couchdb;
 
-import org.elasticsearch.common.settings.ImmutableSettings;
+import org.elasticsearch.action.admin.indices.delete.DeleteIndexRequest;
+import org.elasticsearch.common.xcontent.XContentBuilder;
+import org.elasticsearch.indices.IndexMissingException;
 import org.elasticsearch.node.Node;
-import org.elasticsearch.node.NodeBuilder;
-
+import static org.elasticsearch.common.settings.ImmutableSettings.settingsBuilder;
 import static org.elasticsearch.common.xcontent.XContentFactory.jsonBuilder;
+import static org.elasticsearch.node.NodeBuilder.nodeBuilder;
+import java.io.IOException;
 
-/**
- *
- */
 public class CouchdbRiverTest {
 
     public static void main(String[] args) throws Exception {
-        Node node = NodeBuilder.nodeBuilder().settings(ImmutableSettings.settingsBuilder().put("gateway.type", "local")).node();
-        Thread.sleep(1000);
-        node.client().prepareIndex("_river", "db", "_meta").setSource(jsonBuilder().startObject().field("type", "couchdb").endObject()).execute().actionGet();
+        new CouchdbRiverTest().run();
+    }
 
-        Thread.sleep(1000000);
+    private Node node;
+
+    private String dbName = "db";
+    private String indexName = dbName;
+
+    private void run() throws Exception {
+        node = nodeBuilder().settings(settingsBuilder().put("gateway.type", "local")).node();
+
+        delete("_river");
+        delete(indexName);
+
+        try {
+            node.client().prepareIndex("_river", "couchdb", "_meta").setSource(meta()).execute().actionGet();
+
+            Thread.sleep(1000000);
+        } finally {
+            node.stop();
+        }
+    }
+
+    private XContentBuilder meta() throws IOException {
+        return jsonBuilder().startObject()
+                    .field("type", "couchdb")
+                    .startObject("index").field("name", indexName).field("type", indexName).field("ignore_attachments", true).endObject()
+                    .startObject("couchdb_connection").field("url", "http://localhost:5984").endObject()
+                    .startObject("couchdb_database").field("database", dbName).endObject()
+                    .endObject();
+    }
+
+    private void delete(String resource) throws InterruptedException {
+        try {
+            node.client().admin().indices().delete(new DeleteIndexRequest(resource)).actionGet();
+        } catch (IndexMissingException itsOk) {}
+
+        Thread.sleep(100);
     }
 }
