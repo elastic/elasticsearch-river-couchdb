@@ -53,7 +53,7 @@ public class LastSeqReader {
 
     private String parseLastSeq(GetResponse lastSeqResponse) {
         @SuppressWarnings("unchecked")
-        Map<String, Object> db = (Map) lastSeqResponse.getSourceAsMap().get(databaseConfig.getDatabase());
+        Map<String, Object> db = (Map) lastSeqResponse.sourceAsMap().get(databaseConfig.getDatabase());
         return db == null ? null : (String) db.get(LAST_SEQ);
     }
 }

@@ -76,7 +76,7 @@ public class LastSeqReaderTest {
         lastSeq.put(LAST_SEQ, lastSeqInIndex);
         Map<String, Object> source = newHashMap();
         source.put("database", lastSeq);
-        given(mockedLastSeqResponse.getSourceAsMap()).willReturn(source);
+        given(mockedLastSeqResponse.sourceAsMap()).willReturn(source);
     }
 
     private void givenNoLastSeqInIndex() {
