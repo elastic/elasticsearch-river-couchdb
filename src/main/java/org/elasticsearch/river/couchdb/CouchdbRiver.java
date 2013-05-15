@@ -489,7 +489,11 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
                         stream.put(line);
                     }
                 } catch (Exception e) {
-                    Closeables.closeQuietly(is);
+                    try {
+                        Closeables.close(is, true);
+                    } catch (IOException ex) {
+                        // ignore
+                    }
                     if (connection != null) {
                         try {
                             connection.disconnect();
@@ -511,7 +515,11 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
                         }
                     }
                 } finally {
-                    Closeables.closeQuietly(is);
+                    try {
+                        Closeables.close(is, true);
+                    } catch (IOException ex) {
+                        // ignore
+                    }
                     if (connection != null) {
                         try {
                             connection.disconnect();
