@@ -1,3 +1,33 @@
+CouchDB River Plugin for ElasticSearch - Revisited
+==================================
+
+In what ways does this fork differ from the original elasticsearch/elasticsearch-river-couchdb?
+--------------------------
+I found the original river implementation awfully hard to extend to suit my needs, which were basically about merging feeds from two CouchDb databases into a single elasticsearch index, using some custom processing rules and filtering. This fork is about providing a solid & tested base for your custom rivers. The only functional changes included in this fork are those listed in reliability improvements section. All the rest is about refactoring, and making this plugin more developer-friendly. Plus, I decided to draw the lines a little different in configuration JSON, so it would be easier to add more slurpers/indexers. 
+
+Improvements of reliability:
+----------------------------
++ conditional retrying of failed index requests
++ initial index creation with 10 attempts
+
+Improvements of maintainability:
+--------------------------------
++ the code has been *heavily* refactored leading to an object-oriented design, alignment to SOLID principles & Uncle Bob's Clean Code :)
++ better readability and comprehensibility
++ main class was split into a handful of fairly small, decoupled individual components, each of single responsibility and potentially reusable or swappable.
++ a pack of BDD-like unit-tests covering essential behaviors
++ integration test covering listening to real CouchDB's changes feed
++ unit & integration tests guard against future regression
+
+Improvements of extensibility:
+------------------------------
+The code is pretty much prepared to be a skeleton for other applications. You could easily (still - usually programatically) customize it to suit your needs. You might need to index multiple CouchDb databases into a single elasticsearch index. Or maybe the other way around. Or perform some complicated transformations on the fly. Or use some external resources to decide how to index things. Obviously there is no almighty software, still I believe that it's going to be easy enough to customize/extend this version of river.
+What's out there:
++ onIndex & onDelete hooks out-of-the-box
++ custom indexing-retrying strategies are one step ahead
++ multiple slurpers & indexers can be easily set up with existing bits of code.
+
+
 CouchDB River Plugin for ElasticSearch
 ==================================
 
@@ -36,17 +66,17 @@ The CouchDB River allows to automatically index couchdb and make it searchable u
 
 This call will create a river that uses the **_changes** stream to index all data within couchdb. Moreover, any "future" changes will automatically be indexed as well, making your search index and couchdb synchronized at all times.
 
-The couchdb river is provided as a [plugin](https://github.com/elasticsearch/elasticsearch-river-couchdb) (including explanation on how to install it).
+The couchdb river is provided as a [plugin](https://github.com/pawelrychlik/elasticsearch-river-couchdb) (including explanation on how to install it).
 
 On top of that, in case of a failover, the couchdb river will automatically be started on another elasticsearch node, and continue indexing from the last indexed seq.
 
 Bulking
-======
+----
 
 Bulking is automatically done in order to speed up the indexing process. If within the specified **bulk_timeout** more changes are detected, changes will be bulked up to **bulk_size** before they are indexed.
 
 Filtering
-======
+----
 
 The `changes` stream allows to provide a filter with parameters that will be used by couchdb to filter the stream of changes. Here is how it can be configured:
 
@@ -62,7 +92,7 @@ The `changes` stream allows to provide a filter with parameters that will be use
 	}
 
 Script Filters
-=========
+----
 
 Filtering can also be performed by providing a script (default to JavaScript) that will further process each changed item within the changes stream. The json provided to the script is under a var called **ctx** with the relevant seq stream change (for example, **ctx.doc** will refer to the document, or **ctx.deleted** is the flag if its deleted or not).
 
@@ -84,7 +114,7 @@ Here is an example setting that adds `field1` with value `value1` to all docs:
 	}
 
 Basic Authentication
-===============
+----
 
 Basic Authentication can be used by passing the **username** and **password** attributes.
 
@@ -97,7 +127,7 @@ Basic Authentication can be used by passing the **username** and **password** at
 	}
 
 HTTPS
-=====
+----
 
 To use HTTPS, simply change the url property accordingly. If you have unfixable problems with the servers certificates for any reason, you can disable hostname verification by passing **no_verify**.
 
@@ -111,7 +141,7 @@ To use HTTPS, simply change the url property accordingly. If you have unfixable 
 
 
 Ignoring Attachments
-====================
+----
 
 You can ignore attachments as provided by couchDb for each document (`_attachments` field).
 
@@ -128,7 +158,7 @@ Note, by default, attachments are not ignored (**false**)
 
 
 License
-=======
+----
 
     This software is licensed under the Apache 2 license, quoted below.
 
