@@ -247,6 +247,8 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
             }
         }
 
+        id = (ctx.get("id") == null) ? null : ctx.get("id").toString();
+
         if (ctx.containsKey("ignore") && ctx.get("ignore").equals(Boolean.TRUE)) {
             // ignore dock
         } else if (ctx.containsKey("deleted") && ctx.get("deleted").equals(Boolean.TRUE)) {
