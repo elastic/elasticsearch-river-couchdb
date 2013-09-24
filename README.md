@@ -128,6 +128,26 @@ Here is an example setting that disable *attachments* for all docs:
 Note, by default, attachments are not ignored (**false**)
 
 
+Heartbeat
+=========
+
+By default, couchdb river set _changes API heartbeat to `10s`.
+Since 1.3.0, an additional option has been added to control the HTTP connection timeout (default to `30s`).
+you can control both settings using `heartbeat` and `read_timeout` options:
+
+```sh
+curl -XPUT 'localhost:9200/_river/my_db/_meta' -d '{
+    "type" : "couchdb",
+    "couchdb" : {
+        "host" : "localhost",
+        "port" : 5984,
+        "db" : "my_db",
+        "heartbeat" : "5s",
+        "read_timeout" : "15s"
+    }
+}'
+```
+
 License
 =======
 
