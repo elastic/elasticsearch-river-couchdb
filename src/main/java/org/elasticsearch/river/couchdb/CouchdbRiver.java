@@ -76,6 +76,8 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
     private final String basicAuth;
     private final boolean noVerify;
     private final boolean couchIgnoreAttachments;
+    private final int heartbeat;
+    private final int readTimeout;
 
     private final String indexName;
     private final String typeName;
@@ -120,6 +122,8 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
             } else {
                 couchFilterParamsUrl = null;
             }
+            heartbeat = XContentMapValues.nodeIntegerValue(couchSettings.get("heartbeat"), 10000);
+            readTimeout = XContentMapValues.nodeIntegerValue(couchSettings.get("read_timeout"), 3 * heartbeat);
             couchIgnoreAttachments = XContentMapValues.nodeBooleanValue(couchSettings.get("ignore_attachments"), false);
             if (couchSettings.containsKey("user") && couchSettings.containsKey("password")) {
                 String user = couchSettings.get("user").toString();
@@ -147,6 +151,8 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
             couchFilter = null;
             couchFilterParamsUrl = null;
             couchIgnoreAttachments = false;
+            heartbeat = 10000;
+            readTimeout = 3 * heartbeat;
             noVerify = false;
             basicAuth = null;
             script = null;
@@ -426,7 +432,7 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
                     }
                 }
 
-                String file = "/" + couchDb + "/_changes?feed=continuous&include_docs=true&heartbeat=10000";
+                String file = "/" + couchDb + "/_changes?feed=continuous&include_docs=true&heartbeat=" + heartbeat;
                 if (couchFilter != null) {
                     try {
                         file = file + "&filter=" + URLEncoder.encode(couchFilter, "UTF-8");
@@ -460,6 +466,7 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
                         connection.addRequestProperty("Authorization", basicAuth);
                     }
                     connection.setDoInput(true);
+                    connection.setReadTimeout(readTimeout);
                     connection.setUseCaches(false);
 
                     if (noVerify) {
