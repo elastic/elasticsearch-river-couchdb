@@ -123,7 +123,7 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
                 couchFilterParamsUrl = null;
             }
             heartbeat = XContentMapValues.nodeIntegerValue(couchSettings.get("heartbeat"), 10000);
-            readTimeout = XContentMapValues.nodeIntegerValue(couchSettings.get("read_timeout"), 3 * 10000);
+            readTimeout = XContentMapValues.nodeIntegerValue(couchSettings.get("read_timeout"), 3 * heartbeat);
             couchIgnoreAttachments = XContentMapValues.nodeBooleanValue(couchSettings.get("ignore_attachments"), false);
             if (couchSettings.containsKey("user") && couchSettings.containsKey("password")) {
                 String user = couchSettings.get("user").toString();
@@ -152,7 +152,7 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
             couchFilterParamsUrl = null;
             couchIgnoreAttachments = false;
             heartbeat = 10000;
-            readTimeout = 30000;
+            readTimeout = 3 * heartbeat;
             noVerify = false;
             basicAuth = null;
             script = null;
