@@ -20,9 +20,13 @@
 package org.elasticsearch.river.couchdb;
 
 import org.elasticsearch.ExceptionsHelper;
-import org.elasticsearch.action.bulk.BulkRequestBuilder;
+import org.elasticsearch.action.bulk.BulkItemResponse;
+import org.elasticsearch.action.bulk.BulkProcessor;
+import org.elasticsearch.action.bulk.BulkRequest;
 import org.elasticsearch.action.bulk.BulkResponse;
+import org.elasticsearch.action.delete.DeleteRequest;
 import org.elasticsearch.action.get.GetResponse;
+import org.elasticsearch.action.index.IndexRequest;
 import org.elasticsearch.client.Client;
 import org.elasticsearch.cluster.block.ClusterBlockException;
 import org.elasticsearch.common.Base64;
@@ -54,8 +58,6 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
 
-import static org.elasticsearch.client.Requests.deleteRequest;
-import static org.elasticsearch.client.Requests.indexRequest;
 import static org.elasticsearch.common.xcontent.XContentFactory.jsonBuilder;
 
 /**
@@ -92,6 +94,10 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
     private volatile boolean closed;
 
     private final BlockingQueue<String> stream;
+
+    private final TimeValue bulkFlushInterval;
+    private volatile BulkProcessor bulkProcessor;
+    private final int maxConcurrentBulk;
 
     @SuppressWarnings({"unchecked"})
     @Inject
@@ -168,6 +174,9 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
             } else {
                 bulkTimeout = TimeValue.timeValueMillis(10);
             }
+            this.bulkFlushInterval = TimeValue.parseTimeValue(XContentMapValues.nodeStringValue(
+                    indexSettings.get("flush_interval"), "5s"), TimeValue.timeValueSeconds(5));
+            this.maxConcurrentBulk = XContentMapValues.nodeIntegerValue(indexSettings.get("max_concurrent_bulk"), 1);
             throttleSize = XContentMapValues.nodeIntegerValue(indexSettings.get("throttle_size"), bulkSize * 5);
         } else {
             indexName = couchDb;
@@ -175,6 +184,8 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
             bulkSize = 100;
             bulkTimeout = TimeValue.timeValueMillis(10);
             throttleSize = bulkSize * 5;
+            this.maxConcurrentBulk = 1;
+            this.bulkFlushInterval = TimeValue.timeValueSeconds(5);
         }
         if (throttleSize == -1) {
             stream = new LinkedTransferQueue<String>();
@@ -200,6 +211,40 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
             }
         }
 
+        // Creating bulk processor
+        this.bulkProcessor = BulkProcessor.builder(client, new BulkProcessor.Listener() {
+            @Override
+            public void beforeBulk(long executionId, BulkRequest request) {
+                logger.debug("Going to execute new bulk composed of {} actions", request.numberOfActions());
+            }
+
+            @Override
+            public void afterBulk(long executionId, BulkRequest request, BulkResponse response) {
+                logger.debug("Executed bulk composed of {} actions", request.numberOfActions());
+                if (response.hasFailures()) {
+                    logger.warn("There was failures while executing bulk", response.buildFailureMessage());
+                    if (logger.isDebugEnabled()) {
+                        for (BulkItemResponse item : response.getItems()) {
+                            if (item.isFailed()) {
+                                logger.debug("Error for {}/{}/{} for {} operation: {}", item.getIndex(),
+                                        item.getType(), item.getId(), item.getOpType(), item.getFailureMessage());
+                            }
+                        }
+                    }
+                }
+            }
+
+            @Override
+            public void afterBulk(long executionId, BulkRequest request, Throwable failure) {
+                logger.warn("Error executing bulk", failure);
+            }
+        })
+                .setBulkActions(bulkSize)
+                .setConcurrentRequests(maxConcurrentBulk)
+                .setFlushInterval(bulkFlushInterval)
+                .build();
+
+
         slurperThread = EsExecutors.daemonThreadFactory(settings.globalSettings(), "couchdb_river_slurper").newThread(new Slurper());
         indexerThread = EsExecutors.daemonThreadFactory(settings.globalSettings(), "couchdb_river_indexer").newThread(new Indexer());
         indexerThread.start();
@@ -214,11 +259,16 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
         logger.info("closing couchdb stream river");
         slurperThread.interrupt();
         indexerThread.interrupt();
+
+        if (this.bulkProcessor != null) {
+            this.bulkProcessor.close();
+        }
+
         closed = true;
     }
 
     @SuppressWarnings({"unchecked"})
-    private Object processLine(String s, BulkRequestBuilder bulk) {
+    private Object processLine(String s) {
         Map<String, Object> ctx;
         try {
             ctx = XContentFactory.xContent(XContentType.JSON).createParser(s).mapAndClose();
@@ -263,7 +313,7 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
             if (logger.isTraceEnabled()) {
                 logger.trace("processing [delete]: [{}]/[{}]/[{}]", index, type, id);
             }
-            bulk.add(deleteRequest(index).type(type).id(id).routing(extractRouting(ctx)).parent(extractParent(ctx)));
+            bulkProcessor.add(new DeleteRequest(index, type, id).routing(extractRouting(ctx)).parent(extractParent(ctx)));
         } else if (ctx.containsKey("doc")) {
             String index = extractIndex(ctx);
             String type = extractType(ctx);
@@ -282,7 +332,7 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
                 logger.trace("processing [index ]: [{}]/[{}]/[{}], source {}", index, type, id, doc);
             }
 
-            bulk.add(indexRequest(index).type(type).id(id).source(doc).routing(extractRouting(ctx)).parent(extractParent(ctx)));
+            bulkProcessor.add(new IndexRequest(index, type, id).source(doc).routing(extractRouting(ctx)).parent(extractParent(ctx)));
         } else {
             logger.warn("ignoring unknown change {}", s);
         }
@@ -329,9 +379,9 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
                     }
                     continue;
                 }
-                BulkRequestBuilder bulk = client.prepareBulk();
+
                 Object lastSeq = null;
-                Object lineSeq = processLine(s, bulk);
+                Object lineSeq = processLine(s);
                 if (lineSeq != null) {
                     lastSeq = lineSeq;
                 }
@@ -339,13 +389,9 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
                 // spin a bit to see if we can get some more changes
                 try {
                     while ((s = stream.poll(bulkTimeout.millis(), TimeUnit.MILLISECONDS)) != null) {
-                        lineSeq = processLine(s, bulk);
+                        lineSeq = processLine(s);
                         if (lineSeq != null) {
                             lastSeq = lineSeq;
-                        }
-
-                        if (bulk.numberOfActions() >= bulkSize) {
-                            break;
                         }
                     }
                 } catch (InterruptedException e) {
@@ -379,21 +425,11 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
                         if (logger.isTraceEnabled()) {
                             logger.trace("processing [_seq  ]: [{}]/[{}]/[{}], last_seq [{}]", riverIndexName, riverName.name(), "_seq", lastSeqAsString);
                         }
-                        bulk.add(indexRequest(riverIndexName).type(riverName.name()).id("_seq")
+                        bulkProcessor.add(new IndexRequest(riverIndexName, riverName.name(), "_seq")
                                 .source(jsonBuilder().startObject().startObject("couchdb").field("last_seq", lastSeqAsString).endObject().endObject()));
                     } catch (IOException e) {
                         logger.warn("failed to add last_seq entry to bulk indexing");
                     }
-                }
-
-                try {
-                    BulkResponse response = bulk.execute().actionGet();
-                    if (response.hasFailures()) {
-                        // TODO write to exception queue?
-                        logger.warn("failed to execute" + response.buildFailureMessage());
-                    }
-                } catch (Exception e) {
-                    logger.warn("failed to execute bulk", e);
                 }
             }
         }

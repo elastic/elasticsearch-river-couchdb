@@ -31,7 +31,7 @@ import static org.elasticsearch.common.xcontent.XContentFactory.jsonBuilder;
 public class CouchdbRiverTest {
 
     public static void main(String[] args) throws Exception {
-        Node node = NodeBuilder.nodeBuilder().settings(ImmutableSettings.settingsBuilder().put("gateway.type", "local")).node();
+        Node node = NodeBuilder.nodeBuilder().settings(ImmutableSettings.settingsBuilder().put("gateway.type", "local")).local(true).node();
         Thread.sleep(1000);
         node.client().prepareIndex("_river", "db", "_meta").setSource(jsonBuilder().startObject().field("type", "couchdb").endObject()).execute().actionGet();
 
