@@ -148,6 +148,24 @@ curl -XPUT 'localhost:9200/_river/my_db/_meta' -d '{
 }'
 ```
 
+Starting at a Specific Sequence
+==========
+
+The CouchDB river stores the `last_seq` value in a document called `_seq` in the `_river` index. You can use this fact to start or resume rivers at a particular sequence.
+
+To have the CouchDB river start at a particular `last_seq`, create a document with contents like this:
+
+````sh
+curl -XPUT 'localhost:9200/_river/my_db/_seq' -d '
+{
+  "couchdb": {
+    "last_seq": "100"
+  }
+}'
+````
+
+where 100 is the sequence number you want the river to start from. Then create the `_meta` document as before. The CouchDB river will startup and read the last sequence value and start indexing from there.
+
 License
 =======
 
