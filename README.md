@@ -166,6 +166,90 @@ curl -XPUT 'localhost:9200/_river/my_db/_seq' -d '
 
 where 100 is the sequence number you want the river to start from. Then create the `_meta` document as before. The CouchDB river will startup and read the last sequence value and start indexing from there.
 
+Using CouchDB Views
+====================
+
+Since 1.2.0, you can fetch documents from CouchDB views.
+
+You will have to define a view in CouchDB that can be called with the document id fetched from _changes API.
+So, CouchDB river will call your view with parameter `key="DOCID"`.
+
+As views return a collection of results (aka rows), each row is indexed with an id like DOCID_seq where seq is the sequence number of each row.
+If you get back 3 rows for one single change for document with ID=1234, the river will index 3 documents :
+
+* 1234_1
+* 1234_2
+* 1234_3
+ 
+To use it, you have to define a view in couchDB. For instance, `_design/myviews/_view/myview` with 
+
+```javascript
+function(doc) {
+ // YOUR CODE HERE
+ emit(doc._id, eval('('+YOURCODEHERE+')') );
+}
+```
+
+You can use it in your couchDb river as follow :
+
+``` javascript
+{
+  "type":"couchdb",
+  "couchdb": {
+    "host":"localhost",
+    "port":"5984",
+    "db":"mydb",
+    "view":"myviews/_view/myview",
+    "view_ignore_remove":false
+  }
+}
+```
+
+New options :
+
+* `view` : if not null, couchDB river will not fetch content from `_changes` API but only IDs and then will use the
+view to retrieve rows using the ID as a key. By default : null
+
+* `view_ignore_remove` : ask the river to ignore removal of rows if there is less rows after a document update.
+By default : false so non existing rows will be removed from elastic search.
+
+For example, with the 3 rows described earlier, if you push a new version of the document 1234 in couchDB with only 2 docs, 
+
+If `view_ignore_remove` is false (default), then
+
+* 1234_1 will be updated
+* 1234_2 will be updated
+* 1234_3 will be removed
+
+If `view_ignore_remove` is true, then
+
+* 1234_1 will be updated
+* 1234_2 will be updated
+* 1234_3 will not be updated
+
+Script Views
+============
+
+The parameter `script_view` allows to create script filters on the view
+results. It's working like the `script` parameter, excepted that:
+
+* you have access to the view result, and not the document,
+* you must use `view` instead of `ctx`.
+
+Here is a example which set the field `_parent` to the same value as the field
+`field1` of the view:
+
+``` javascript
+{
+    "type": "couchdb",
+    "couchdb": {
+        ...
+        "view": "myviews/_view/myview",
+        "script_view": "view._parent = view.field1"
+    }
+}
+```
+
 License
 =======
 
