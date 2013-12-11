@@ -55,6 +55,8 @@ public class ChangeProcessor {
         @SuppressWarnings("unchecked")
         Map<String, Object> doc = (Map<String, Object>) ctx.get("doc");
 
+        id = (ctx.get("id") == null) ? null : ctx.get("id").toString();
+
         if (Boolean.TRUE.equals(ctx.get("ignore"))) {
             logger.debug("Ignoring update of document [id={}]; CouchDB changes feed seq=[{}].", id, seq);
         } else if (Boolean.TRUE.equals(ctx.get("deleted"))) {

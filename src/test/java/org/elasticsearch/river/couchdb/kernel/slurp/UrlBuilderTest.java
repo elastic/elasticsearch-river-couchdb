@@ -32,7 +32,7 @@ public class UrlBuilderTest {
         URL built = urlBuilder.build();
 
         // then
-        String expectedUrl = "http://some.url/testdb/_changes?feed=continuous&include_docs=true&heartbeat=30000";
+        String expectedUrl = "http://some.url/testdb/_changes?feed=continuous&include_docs=true&heartbeat=20000";
         assertThat(built).isEqualTo(new URL(expectedUrl));
     }
 
@@ -47,12 +47,13 @@ public class UrlBuilderTest {
         URL built = urlBuilder.build();
 
         // then
-        String expectedUrl = "http://some.url/testdb/_changes?feed=continuous&include_docs=true&heartbeat=30000&since=1337";
+        String expectedUrl = "http://some.url/testdb/_changes?feed=continuous&include_docs=true&heartbeat=20000&since=1337";
         assertThat(built).isEqualTo(new URL(expectedUrl));
     }
 
     private void givenConfigs() throws Exception {
         given(connectionConfig.getUrl()).willReturn(new URL("http://some.url"));
+        given(connectionConfig.getHeartbeatMillis()).willReturn(20000L);
         given(databaseConfig.getDatabase()).willReturn("testdb");
     }
 }

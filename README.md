@@ -33,24 +33,35 @@ CouchDB River Plugin for ElasticSearch
 
 The CouchDB River plugin allows to hook into couchdb `_changes` feed and automatically index it into elasticsearch.
 
-In order to install the plugin, simply run: `bin/plugin -install elasticsearch/elasticsearch-river-couchdb/1.1.0`.
+In order to install the plugin, clone repository, build locally using maven with `mvn clean package`,
+then simply run: `bin/plugin --install elasticsearch-river-couchdb-alt --url target/releases/elasticsearch-river-couchdb-alt-1.4.1.zip`.
 
-    -------------------------------------
-    | CouchDB Plugin | ElasticSearch    |
-    -------------------------------------
-    | master         | 0.21 -> master   |
-    -------------------------------------
-    | 1.1.0          | 0.19 -> 0.20     |
-    -------------------------------------
-    | 1.0.0          | 0.18             |
-    -------------------------------------
+    ---------------------------------------------------------------------
+    | CouchDB Plugin | ElasticSearch                                    |
+    ---------------------------------------------------------------------
+    | master         | 1.0.0.Beta2                                      |
+    ---------------------------------------------------------------------
+    | 1.4.1          | 1.0.0.Beta2  (not released, build from tag)      |
+    ---------------------------------------------------------------------
+    | 1.4.0          | 1.0.0.Beta1  (not released, build from tag)      |
+    ---------------------------------------------------------------------
+    | 1.2.5          | 0.90.5 -> 0.90.7  (not released, build from tag) |
+    ---------------------------------------------------------------------
+    | 1.2.0          | 0.90 -> 0.90.2                                   |
+    ---------------------------------------------------------------------
+    | 1.1.0          | 0.19 -> 0.20                                     |
+    ---------------------------------------------------------------------
+    | 1.0.0          | 0.18                                             |
+    ---------------------------------------------------------------------
 
 The CouchDB River allows to automatically index couchdb and make it searchable using the excellent [_changes](http://guide.couchdb.org/draft/notifications.html) stream couchdb provides. Setting it up is as simple as executing the following against elasticsearch:
 
 	curl -XPUT 'localhost:9200/_river/my_db/_meta' -d '{
 	    "type" : "couchdb",
 	    "couchdb_connection" : {
-	        "url" : "http://localhost:5984"
+	        "url" : "http://localhost:5984",
+	        "heartbeat" : "5s",
+            "read_timeout" : "15s"
 	    },
 	    "couchdb_database" : {
 	        "database" : "my_db"
@@ -157,12 +168,31 @@ Here is an example setting that disable *attachments* for all docs:
 Note, by default, attachments are not ignored (**false**)
 
 
+Starting at a Specific Sequence
+==========
+
+The CouchDB river stores the `last_seq` value in a document called `_seq` in the `_river` index. You can use this fact to start or resume rivers at a particular sequence.
+
+To have the CouchDB river start at a particular `last_seq`, create a document with contents like this:
+
+````sh
+curl -XPUT 'localhost:9200/_river/my_db/_seq' -d '
+{
+  "couchdb": {
+    "last_seq": "100"
+  }
+}'
+````
+
+where 100 is the sequence number you want the river to start from. Then create the `_meta` document as before. The CouchDB river will startup and read the last sequence value and start indexing from there.
+
+
 License
 ----
 
     This software is licensed under the Apache 2 license, quoted below.
 
-    Copyright 2009-2012 Shay Banon and ElasticSearch <http://www.elasticsearch.org>
+    Copyright 2009-2013 Shay Banon and ElasticSearch <http://www.elasticsearch.org>
 
     Licensed under the Apache License, Version 2.0 (the "License"); you may not
     use this file except in compliance with the License. You may obtain a copy of
