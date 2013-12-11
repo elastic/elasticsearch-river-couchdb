@@ -52,7 +52,9 @@ public class Helpers {
             } catch (Exception ignored) {}
         }
         try {
-           reader.close();
+            if (reader != null) {
+               reader.close();
+            }
         } catch (IOException ex) {
             // Ignore
         }

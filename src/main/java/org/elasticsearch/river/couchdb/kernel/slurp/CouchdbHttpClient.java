@@ -43,7 +43,7 @@ public class CouchdbHttpClient {
         } catch (InterruptedException ie) {
             throw ie;
         } catch (Exception e) {
-            logger.warn("Error occurred when listening for CouchDB changes.");
+            logger.warn("Error occurred when listening for CouchDB changes.", e);
             propagate(e);
         } finally {
             closeQuietly(connection, reader);
