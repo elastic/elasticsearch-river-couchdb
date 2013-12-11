@@ -2,7 +2,6 @@ package org.elasticsearch.river.couchdb.util;
 
 import static org.elasticsearch.common.base.Joiner.on;
 import static org.elasticsearch.common.base.Throwables.propagate;
-import org.elasticsearch.common.io.Closeables;
 
 import java.io.*;
 import java.net.HttpURLConnection;
@@ -53,7 +52,7 @@ public class Helpers {
             } catch (Exception ignored) {}
         }
         try {
-            Closeables.close(reader, true);
+           reader.close();
         } catch (IOException ex) {
             // Ignore
         }
