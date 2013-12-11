@@ -3,11 +3,8 @@ package org.elasticsearch.river.couchdb.util;
 import static org.elasticsearch.common.base.Joiner.on;
 import static org.elasticsearch.common.base.Throwables.propagate;
 import org.elasticsearch.common.io.Closeables;
-import java.io.BufferedReader;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.Reader;
-import java.io.UnsupportedEncodingException;
+
+import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -55,7 +52,11 @@ public class Helpers {
                 connection.disconnect();
             } catch (Exception ignored) {}
         }
-        Closeables.closeQuietly(reader);
+        try {
+            Closeables.close(reader, true);
+        } catch (IOException ex) {
+            // Ignore
+        }
     }
 
 }
