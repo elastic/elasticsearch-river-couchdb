@@ -54,6 +54,7 @@ public class CouchdbHttpClient {
         HttpURLConnection connection = (HttpURLConnection) url.openConnection();
         connection.setDoInput(true);
         connection.setUseCaches(false);
+        connection.setReadTimeout((int)connectionConfig.getReadTimeoutMillis());
 
         if (connectionConfig.requiresAuthentication()) {
             connection.addRequestProperty("Authorization", connectionConfig.getBasicAuthHeader());

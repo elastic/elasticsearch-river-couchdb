@@ -33,12 +33,14 @@ CouchDB River Plugin for ElasticSearch
 
 The CouchDB River plugin allows to hook into couchdb `_changes` feed and automatically index it into elasticsearch.
 
-In order to install the plugin, simply run: `bin/plugin -install elasticsearch/elasticsearch-river-couchdb/1.2.0`.
+In order to install the plugin, simply run: `bin/plugin -install elasticsearch/elasticsearch-river-couchdb/1.4.0`.
 
     ---------------------------------------------------------------------
     | CouchDB Plugin | ElasticSearch                                    |
     ---------------------------------------------------------------------
-    | master         | 0.90.7                                           |
+    | master         | 1.0.0.Beta1                                      |
+    ---------------------------------------------------------------------
+    | 1.4.0          | 1.0.0.Beta1  (not released, build from tag)      |
     ---------------------------------------------------------------------
     | 1.2.5          | 0.90.5 -> 0.90.7  (not released, build from tag) |
     ---------------------------------------------------------------------
@@ -54,7 +56,9 @@ The CouchDB River allows to automatically index couchdb and make it searchable u
 	curl -XPUT 'localhost:9200/_river/my_db/_meta' -d '{
 	    "type" : "couchdb",
 	    "couchdb_connection" : {
-	        "url" : "http://localhost:5984"
+	        "url" : "http://localhost:5984",
+	        "heartbeat" : "5s",
+            "read_timeout" : "15s"
 	    },
 	    "couchdb_database" : {
 	        "database" : "my_db"
@@ -159,6 +163,25 @@ Here is an example setting that disable *attachments* for all docs:
 	}
 
 Note, by default, attachments are not ignored (**false**)
+
+
+Starting at a Specific Sequence
+==========
+
+The CouchDB river stores the `last_seq` value in a document called `_seq` in the `_river` index. You can use this fact to start or resume rivers at a particular sequence.
+
+To have the CouchDB river start at a particular `last_seq`, create a document with contents like this:
+
+````sh
+curl -XPUT 'localhost:9200/_river/my_db/_seq' -d '
+{
+  "couchdb": {
+    "last_seq": "100"
+  }
+}'
+````
+
+where 100 is the sequence number you want the river to start from. Then create the `_meta` document as before. The CouchDB river will startup and read the last sequence value and start indexing from there.
 
 
 License

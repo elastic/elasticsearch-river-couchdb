@@ -33,7 +33,7 @@ public class UrlBuilder {
     private String commonUrlBase() {
         StringBuilder sb = new StringBuilder(connectionConfig.getUrl().toString()).append("/")
                 .append(databaseConfig.getDatabase())
-                .append("/_changes?feed=continuous&include_docs=true&heartbeat=30000");
+                .append("/_changes?feed=continuous&include_docs=true&heartbeat=" + connectionConfig.getHeartbeatMillis());
 
         if (databaseConfig.shouldUseFilter()) {
             sb.append(databaseConfig.buildFilterUrlParams());

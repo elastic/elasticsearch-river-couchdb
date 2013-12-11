@@ -28,6 +28,9 @@ public class CouchdbConnectionConfigTest {
         assertThat(cfg.getBasicAuthHeader()).isEqualTo("Basic d2F0bWFuOndhdHdhdHdhdCE=");
 
         assertThat(cfg.shouldVerifyHostname()).isFalse();
+
+        assertThat(cfg.getHeartbeatMillis()).isEqualTo(20000);
+        assertThat(cfg.getReadTimeoutMillis()).isEqualTo(60000);
     }
 
     @Test
@@ -50,6 +53,8 @@ public class CouchdbConnectionConfigTest {
         couchdbConnection.put(NO_VERIFY, true);
         couchdbConnection.put(USERNAME, "watman");
         couchdbConnection.put(PASSWORD, "watwatwat!");
+        couchdbConnection.put(HEARTBEAT, "20s");
+        couchdbConnection.put(READTIMEOUT, "60s");
         Map<String, Object> settings = newHashMap();
         settings.put(COUCHDB_CONNECTION, couchdbConnection);
         return new RiverSettings(null, settings);
