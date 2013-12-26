@@ -43,8 +43,6 @@ Bulking
 
 Bulking is automatically done in order to speed up the indexing process. If within the specified `bulk_timeout` more changes are detected,
 changes will be bulked up to `bulk_size` before they are indexed.
-<<<<<<< refs/heads/master
-=======
 
 Since 1.3.0, by default, `bulk` size is `100`. A bulk is flushed every `5s`. Number of concurrent requests allowed to be executed is 1.
 You can modify those settings within index section:
@@ -61,7 +59,6 @@ You can modify those settings within index section:
     }
 }
 ```
->>>>>>> HEAD~0
 
 Filtering
 ======
