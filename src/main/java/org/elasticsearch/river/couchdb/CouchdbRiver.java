@@ -19,6 +19,7 @@
 
 package org.elasticsearch.river.couchdb;
 
+import org.apache.lucene.util.IOUtils;
 import org.elasticsearch.ExceptionsHelper;
 import org.elasticsearch.action.bulk.BulkItemResponse;
 import org.elasticsearch.action.bulk.BulkProcessor;
@@ -32,7 +33,6 @@ import org.elasticsearch.cluster.block.ClusterBlockException;
 import org.elasticsearch.common.Base64;
 import org.elasticsearch.common.collect.Maps;
 import org.elasticsearch.common.inject.Inject;
-import org.elasticsearch.common.io.Closeables;
 import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.common.util.concurrent.EsExecutors;
 import org.elasticsearch.common.util.concurrent.jsr166y.LinkedTransferQueue;
@@ -534,11 +534,7 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
                         stream.put(line);
                     }
                 } catch (Exception e) {
-                    try {
-                        Closeables.close(is, true);
-                    } catch (IOException e1) {
-                        // Ignore
-                    }
+                    IOUtils.closeWhileHandlingException(is);
                     if (connection != null) {
                         try {
                             connection.disconnect();
@@ -560,11 +556,7 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
                         }
                     }
                 } finally {
-                    try {
-                        Closeables.close(is, true);
-                    } catch (IOException e1) {
-                        // Ignore
-                    }
+                    IOUtils.closeWhileHandlingException(is);
                     if (connection != null) {
                         try {
                             connection.disconnect();

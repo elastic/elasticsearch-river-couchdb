@@ -7,8 +7,8 @@ In order to install the plugin, simply run: `bin/plugin -install elasticsearch/e
 
 |     CouchDB Plugin       | elasticsearch    | Release date |
 |--------------------------|------------------|:------------:|
-| 1.3.0-SNAPSHOT (master)  | 0.90.0 -> master |              |
-| 1.2.0                    | 0.90.0 -> master |  2013-05-15  |
+| 1.3.0-SNAPSHOT (master)  | 0.90.3 -> master |              |
+| 1.2.0                    | 0.90.0 -> 0.90.2 |  2013-05-15  |
 | 1.1.0                    | 0.19 -> 0.20     |  2012-01-07  |
 | 1.0.0                    | 0.18             |  2011-12-05  |
 
