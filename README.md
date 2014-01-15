@@ -3,11 +3,12 @@ CouchDB River Plugin for Elasticsearch
 
 The CouchDB River plugin allows to hook into couchdb `_changes` feed and automatically index it into elasticsearch.
 
-In order to install the plugin, simply run: `bin/plugin -install elasticsearch/elasticsearch-river-couchdb/1.3.0`.
+In order to install the plugin, simply run: `bin/plugin -install elasticsearch/elasticsearch-river-couchdb/2.0.0.RC1`.
 
 |       CouchDB Plugin        |    elasticsearch    | Release date |
 |-----------------------------|---------------------|:------------:|
-| 2.0.0.RC1-SNAPSHOT (master) | 1.0.0.RC1 -> master |              |
+| 2.0.0-SNAPSHOT (master)     | 1.0.0.RC1 -> master |              |
+| 2.0.0.RC1                   | 1.0.0.RC1 -> master |  2014-01-15  |
 | 1.4.0-SNAPSHOT (1.x)        | 0.90.3 -> 0.90      |              |
 | 1.3.0                       | 0.90.3 -> 0.90      |  2013-12-26  |
 | 1.2.0                       | 0.90.0 -> 0.90.2    |  2013-05-15  |
