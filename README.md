@@ -11,6 +11,7 @@ In order to install the plugin, simply run: `bin/plugin -install elasticsearch/e
 
 |       CouchDB Plugin        |    elasticsearch    | Release date |
 |-----------------------------|---------------------|:------------:|
+| 2.1.0-SNAPSHOT              | 1.0.0.RC1 -> master |  XXXX-XX-XX  |
 | 2.0.0                       | 1.0.0.RC1 -> master |  2014-03-03  |
 | 2.0.0.RC1                   | 1.0.0.RC1 -> master |  2014-01-15  |
 
