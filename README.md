@@ -267,7 +267,7 @@ like this to the CouchDB server, replacing the `_rev` field with the
 revision of the document you want to delete:
 
 ```json
-POST /amazon/_bulkdocs HTTP/1.1
+POST /amazon/_bulk_docs HTTP/1.1
 
 {
   "docs" : [
