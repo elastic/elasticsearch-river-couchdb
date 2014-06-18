@@ -266,9 +266,8 @@ For example, to delete the above "cd" document, you must post a document
 like this to the CouchDB server, replacing the `_rev` field with the
 revision of the document you want to delete:
 
-```json
-POST /amazon/_bulk_docs HTTP/1.1
-
+```sh
+curl -XPOST $COUCHDB_HOST:5984/amazon/_bulk_docs -d '
 {
   "docs" : [
     {
@@ -278,7 +277,7 @@ POST /amazon/_bulk_docs HTTP/1.1
         "type" : "cd"
     }
   ]
-}
+}'
 ```
 
 This deletes the document while preserving the type information for ES.
