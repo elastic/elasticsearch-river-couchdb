@@ -198,4 +198,25 @@ public class CouchdbRiverIntegrationTest extends ElasticsearchIntegrationTest {
         assertThat(response.getHits().getAt(0).field("newfield").getValue().toString(), is("bar"));
     }
 
+    /**
+     * Test case for #44: https://github.com/elasticsearch/elasticsearch-river-couchdb/issues/44
+     */
+    @Test
+    public void testScriptingQuote_44() throws IOException, InterruptedException {
+        launchTest(jsonBuilder()
+                .startObject()
+                    .field("type", "couchdb")
+                    .startObject("couchdb")
+                        .field("script", "ctx.doc.newfield = 'value1'")
+                    .endObject()
+                .endObject(), randomIntBetween(5, 1000), null);
+
+        SearchResponse response = client().prepareSearch(getDbName())
+                .addField("newfield")
+                .get();
+
+        assertThat(response.getHits().getAt(0).field("newfield"), notNullValue());
+        assertThat(response.getHits().getAt(0).field("newfield").getValue().toString(), is("value1"));
+    }
+
 }
