@@ -153,7 +153,7 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
             couchProtocol = "http";
             couchHost = "localhost";
             couchPort = 5984;
-            couchDb = "db";
+            couchDb = riverName.name();
             couchFilter = null;
             couchFilterParamsUrl = null;
             couchIgnoreAttachments = false;
