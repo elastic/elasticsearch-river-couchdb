@@ -90,15 +90,21 @@ The `changes` stream allows to provide a filter with parameters that will be use
 Script Filters
 =========
 
-Filtering can also be performed by providing a script (default to JavaScript) that will further process each changed item within the changes stream. The json provided to the script is under a var called **ctx** with the relevant seq stream change (for example, **ctx.doc** will refer to the document, or **ctx.deleted** is the flag if its deleted or not).
+Filtering can also be performed by providing a script that will further process each changed item 
+within the changes stream. The json provided to the script is under a var called **ctx** with the relevant seq stream 
+change (for example, **ctx.doc** will refer to the document, or **ctx.deleted** is the flag if its deleted or not).
 
-Note, this feature requires the `lang-javascript` plugin.
+Any other [script language supported by Elasticsearch](http://www.elasticsearch.org/guide/en/elasticsearch/reference/current/modules-plugins.html#scripting) 
+may be used by setting the `script_type` parameter to the appropriate value. 
 
-Any other script language supported by ElasticSearch may be used by setting the `script_type` parameter to the appropriate value. If unspecified, the default is "js" (javascript). See http://www.elasticsearch.org/guide/reference/modules/scripting.html for details. 
+If unspecified, the default is `mvel`. 
+See [Scripting documentation](http://www.elasticsearch.org/guide/en/elasticsearch/reference/current/modules-scripting.html) for details. 
 
-The **ctx.doc** can be changed and its value can will be indexed (assuming its not a deleted change). Also, if **ctx.ignore** is set to true, the change seq will be ignore and not applied.
+The **ctx.doc** can be changed and its value can will be indexed (assuming its not a deleted change). 
+Also, if **ctx.ignore** is set to true, the change seq will be ignore and not applied.
 
-Other possible values that can be set are **ctx.index** to control the index name to index the doc into, **ctx.type** to control the (mapping) type to index into, **ctx._parent** and **ctx._routing**.
+Other possible values that can be set are **ctx.index** to control the index name to index the doc into, **ctx.type** 
+to control the (mapping) type to index into, **ctx._parent** and **ctx._routing**.
 
 Here is an example setting that adds `field1` with value `value1` to all docs:
 
