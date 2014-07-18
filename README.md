@@ -269,12 +269,12 @@ to determine what type you're trying to delete. Instead you must
 preserve some information about the document you deleted by using the
 CouchDB bulk document interface.
 
-For example, to delete the above "cd" document, you must do something
-like this:
+For example, to delete the above "cd" document, you must post a document
+like this to the CouchDB server, replacing the `_rev` field with the
+revision of the document you want to delete:
 
-```json
-POST /amazon/_bulkdocs HTTP/1.1
-
+```sh
+curl -XPOST http://localhost:5984/amazon/_bulk_docs -d '
 {
   "docs" : [
     {
@@ -284,7 +284,7 @@ POST /amazon/_bulkdocs HTTP/1.1
         "type" : "cd"
     }
   ]
-}
+}'
 ```
 
 This deletes the document while preserving the type information for ES.
