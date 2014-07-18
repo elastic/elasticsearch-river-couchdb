@@ -190,4 +190,24 @@ public class CouchdbRiverIntegrationTest extends ElasticsearchIntegrationTest {
                     .field("type", "couchdb")
                 .endObject(), randomIntBetween(5, 1000), null);
     }
+
+    @Test
+    public void testScriptingDefaultEngine() throws IOException, InterruptedException {
+        launchTest(jsonBuilder()
+                .startObject()
+                    .field("type", "couchdb")
+                    .startObject("couchdb")
+                        .field("script_type", "mvel")
+                        .field("script", "ctx.doc.newfield = ctx.doc.foo")
+                    .endObject()
+                .endObject(), randomIntBetween(5, 1000), null);
+
+        SearchResponse response = client().prepareSearch(getDbName())
+                .addField("newfield")
+                .get();
+
+        assertThat(response.getHits().getAt(0).field("newfield"), notNullValue());
+        assertThat(response.getHits().getAt(0).field("newfield").getValue().toString(), is("bar"));
+    }
+
 }
