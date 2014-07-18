@@ -184,7 +184,7 @@ public class CouchdbRiverIntegrationTest extends ElasticsearchIntegrationTest {
     public void testSimple() throws IOException, InterruptedException {
         launchTest(jsonBuilder()
                 .startObject()
-                    .field("type", "couchdb")
+                .field("type", "couchdb")
                 .endObject(), randomIntBetween(5, 1000), null);
     }
 
@@ -213,10 +213,10 @@ public class CouchdbRiverIntegrationTest extends ElasticsearchIntegrationTest {
     public void testScriptingQuote_44() throws IOException, InterruptedException {
         launchTest(jsonBuilder()
                 .startObject()
-                    .field("type", "couchdb")
-                    .startObject("couchdb")
-                        .field("script", "ctx.doc.newfield = 'value1'")
-                    .endObject()
+                .field("type", "couchdb")
+                .startObject("couchdb")
+                .field("script", "ctx.doc.newfield = 'value1'")
+                .endObject()
                 .endObject(), randomIntBetween(5, 1000), null);
 
         SearchResponse response = client().prepareSearch(getDbName())
@@ -296,4 +296,29 @@ public class CouchdbRiverIntegrationTest extends ElasticsearchIntegrationTest {
         assertThat(response.getHits().getAt(0).getType(), is("region"));
         assertThat(response.getHits().getAt(0).getId(), is("1"));
     }
+
+    /**
+     * Test case for #45: https://github.com/elasticsearch/elasticsearch-river-couchdb/issues/45
+     */
+    @Test
+    public void testScriptingTypeOf_45() throws IOException, InterruptedException {
+        launchTest(jsonBuilder()
+                .startObject()
+                    .field("type", "couchdb")
+                    .startObject("couchdb")
+                        .field("script", "var oblitertron = function(x) { var things = [\"foo\"]; var toberemoved = new java.util.ArrayList(); foreach (i : x.keySet()) { if(things.indexOf(i) == -1) { toberemoved.add(i); } } foreach (i : toberemoved) { x.remove(i); } return x; }; ctx.doc = oblitertron(ctx.doc);")
+                    .endObject()
+                .endObject(), randomIntBetween(5, 1000), null);
+
+        SearchResponse response = client().prepareSearch(getDbName())
+                .addField("foo")
+                .addField("_id")
+                .get();
+
+        assertThat(response.getHits().getAt(0).field("foo"), notNullValue());
+        assertThat(response.getHits().getAt(0).field("foo").getValue().toString(), is("bar"));
+        assertThat(response.getHits().getAt(0).field("_id"), nullValue());
+    }
+
+
 }
