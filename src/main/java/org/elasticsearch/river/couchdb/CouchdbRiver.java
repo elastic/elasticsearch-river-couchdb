@@ -265,11 +265,11 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
         slurperThread.interrupt();
         indexerThread.interrupt();
 
+        closed = true;
+
         if (this.bulkProcessor != null) {
             this.bulkProcessor.close();
         }
-
-        closed = true;
     }
 
     @SuppressWarnings({"unchecked"})
@@ -296,6 +296,11 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
             return seq;
         }
 
+        if (closed) {
+            logger.warn("river was closing while processing couchdb doc [{}]. Operation skipped.", id);
+            return null;
+        }
+
         if (script != null) {
             script.setNextVar("ctx", ctx);
             try {
@@ -318,6 +323,10 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
             if (logger.isTraceEnabled()) {
                 logger.trace("processing [delete]: [{}]/[{}]/[{}]", index, type, id);
             }
+            if (closed) {
+                logger.warn("river was closing while trying to delete document [{}/{}/{}]. Operation skipped.", index, type, id);
+                return null;
+            }
             bulkProcessor.add(new DeleteRequest(index, type, id).routing(extractRouting(ctx)).parent(extractParent(ctx)));
         } else if (ctx.containsKey("doc")) {
             String index = extractIndex(ctx);
@@ -336,7 +345,10 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
             if (logger.isTraceEnabled()) {
                 logger.trace("processing [index ]: [{}]/[{}]/[{}], source {}", index, type, id, doc);
             }
-
+            if (closed) {
+                logger.warn("river was closing while trying to index document [{}/{}/{}]. Operation skipped.", index, type, id);
+                return null;
+            }
             bulkProcessor.add(new IndexRequest(index, type, id).source(doc).routing(extractRouting(ctx)).parent(extractParent(ctx)));
         } else {
             logger.warn("ignoring unknown change {}", s);
@@ -429,6 +441,10 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
                         }
                         if (logger.isTraceEnabled()) {
                             logger.trace("processing [_seq  ]: [{}]/[{}]/[{}], last_seq [{}]", riverIndexName, riverName.name(), "_seq", lastSeqAsString);
+                        }
+                        if (closed) {
+                            logger.warn("river was closing while trying to update sequence [{}/{}/{}]. Operation skipped.", riverIndexName, riverName.name(), "_seq");
+                            return;
                         }
                         bulkProcessor.add(new IndexRequest(riverIndexName, riverName.name(), "_seq")
                                 .source(jsonBuilder().startObject().startObject("couchdb").field("last_seq", lastSeqAsString).endObject().endObject()));
