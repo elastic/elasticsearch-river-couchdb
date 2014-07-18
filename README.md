@@ -345,6 +345,44 @@ And the launch the river with the following script:
 }
 ```
 
+Removing fields using a script
+------------------------------
+
+You can remove fields using a script like this:
+
+```
+{
+    "type": "couchdb",
+    "couchdb": {
+        "script": "var oblitertron = function(x) { var things = [\"foo\"]; var toberemoved = new java.util.ArrayList(); foreach (i : x.keySet()) { if(things.indexOf(i) == -1) { toberemoved.add(i); } } foreach (i : toberemoved) { x.remove(i); } return x; }; ctx.doc = oblitertron(ctx.doc);"
+    }
+}
+```
+
+A more readable version of the script (with comments) is:
+
+```js
+var oblitertron = function (x) {
+    // List of fields we want to keep. Others will be removed, such as _id, _rev...
+    var things = ["foo"];
+    var toberemoved = new java.util.ArrayList();
+    foreach(i : x.keySet()) {
+        if (things.indexOf(i) == -1) {
+            // If we find a field to be removed, we store its name in an array
+            toberemoved.add(i);
+        }
+    }
+    // We remove useless fields
+    foreach(i : toberemoved) {
+        x.remove(i);
+    }
+    // We return the new document which will be indexed.
+    return x;
+};
+ctx.doc = oblitertron(ctx.doc);
+```
+
+
 License
 =======
 
