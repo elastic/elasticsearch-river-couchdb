@@ -298,6 +298,53 @@ This deletes the document while preserving the type information for ES.
 You can extend this technique to store more data in deleted documents
 but be aware of the disk space usage.
 
+Indexing parent/child documents
+-------------------------------
+
+If you need to index relational documents using the parent/child feature, you could
+do it using a script filter.
+
+For example, let's say you have two types of document in CouchDB: Regions and Campuses.
+
+```
+// Region 1
+{
+    "type": "region",
+    "name": "bretagne"
+}
+```
+
+```
+// Campus 2
+{
+    "type": "campus",
+    "name": "enib",
+    "parent_id": "1"
+}
+```
+
+You can use the following mapping for `campus`:
+
+```
+{
+    "campus" : {
+        "_parent" : {
+            "type" : "region"
+        }
+    }
+}
+```
+
+And the launch the river with the following script:
+
+```
+{
+    "type": "couchdb",
+    "couchdb": {
+        "script": "ctx._type = ctx.doc.type; if (ctx._type == 'campus') { ctx._parent = ctx.doc.parent_id; }"
+    }
+}
+```
 
 License
 =======
