@@ -24,15 +24,19 @@ import org.elasticsearch.common.Strings;
 import org.elasticsearch.common.base.Predicate;
 import org.elasticsearch.common.collect.ImmutableList;
 import org.elasticsearch.common.xcontent.XContentBuilder;
+import org.elasticsearch.index.query.QueryBuilders;
+import org.elasticsearch.indices.IndexAlreadyExistsException;
 import org.elasticsearch.indices.IndexMissingException;
 import org.elasticsearch.river.couchdb.helper.CouchDBClient;
 import org.elasticsearch.test.ElasticsearchIntegrationTest;
 import org.junit.Test;
 
 import java.io.IOException;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
 import static org.elasticsearch.common.xcontent.XContentFactory.jsonBuilder;
+import static org.elasticsearch.river.couchdb.helper.CouchDBClient.putDocument;
 import static org.elasticsearch.river.couchdb.helper.CouchDBClient.putDocumentWithAttachments;
 import static org.hamcrest.Matchers.*;
 
@@ -73,7 +77,11 @@ public class CouchdbRiverIntegrationTest extends ElasticsearchIntegrationTest {
         }
 
         logger.info("  -> Create river");
-        createIndex(getDbName());
+        try {
+            createIndex(getDbName());
+        } catch (IndexAlreadyExistsException e) {
+            // No worries. We already created the index before
+        }
         index("_river", getDbName(), "_meta", river);
 
         logger.info("  -> Wait for some docs");
@@ -219,4 +227,73 @@ public class CouchdbRiverIntegrationTest extends ElasticsearchIntegrationTest {
         assertThat(response.getHits().getAt(0).field("newfield").getValue().toString(), is("value1"));
     }
 
+    /**
+     * Test case for #51: https://github.com/elasticsearch/elasticsearch-river-couchdb/issues/51
+     */
+    @Test
+    public void testScriptingParentChild_51() throws IOException, InterruptedException, ExecutionException {
+        prepareCreate(getDbName())
+                .addMapping("region", jsonBuilder()
+                        .startObject()
+                            .startObject("region")
+                            .endObject()
+                        .endObject().string())
+                .addMapping("campus", jsonBuilder()
+                        .startObject()
+                            .startObject("campus")
+                                .startObject("_parent")
+                                    .field("type", "region")
+                                .endObject()
+                            .endObject()
+                        .endObject().string())
+                .get();
+
+        launchTest(jsonBuilder()
+                .startObject()
+                    .field("type", "couchdb")
+                    .startObject("couchdb")
+                        .field("script", "ctx._type = ctx.doc.type; if (ctx._type == 'campus') { ctx._parent = ctx.doc.parent_id; }")
+                    .endObject()
+                .endObject(), 0, new InjectorHook() {
+            @Override
+            public void inject() {
+                try {
+                    putDocument(getDbName(), "1",
+                            "type", "region",
+                            "name", "bretagne");
+                    putDocument(getDbName(), "2",
+                            "type", "campus",
+                            "name", "enib",
+                            "parent_id", "1");
+                } catch (IOException e) {
+                    logger.error("Error while injecting documents");
+                }
+            }
+        });
+
+        // Check that docs are indexed by the river
+        assertThat(awaitBusy(new Predicate<Object>() {
+            public boolean apply(Object obj) {
+                try {
+                    refresh();
+                    SearchResponse response = client().prepareSearch(getDbName()).get();
+                    logger.info("  -> got {} docs in {} index", response.getHits().totalHits(), getDbName());
+                    return response.getHits().totalHits() == 2;
+                } catch (IndexMissingException e) {
+                    return false;
+                }
+            }
+        }, 1, TimeUnit.MINUTES), equalTo(true));
+
+        SearchResponse response = client().prepareSearch(getDbName())
+                .setQuery(
+                        QueryBuilders.hasChildQuery("campus",
+                                QueryBuilders.matchQuery("name", "enib"))
+                )
+                .get();
+
+        assertThat(response.getHits().getTotalHits(), is(1L));
+        assertThat(response.getHits().getAt(0).getType(), is("region"));
+        assertThat(response.getHits().getAt(0).getId(), is("1"));
+    }
 }
