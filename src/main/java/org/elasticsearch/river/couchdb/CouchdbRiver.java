@@ -141,8 +141,13 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
 
             if (couchSettings.containsKey("script")) {
                 String scriptType = "js";
+                // TODO Remove scriptType support (deprecated)
                 if(couchSettings.containsKey("scriptType")) {
+                    logger.warn("scriptType has been deprecated. Please use script_type.");
                     scriptType = couchSettings.get("scriptType").toString();
+                }
+                if(couchSettings.containsKey("script_type")) {
+                    scriptType = couchSettings.get("script_type").toString();
                 }
 
                 script = scriptService.executable(scriptType, couchSettings.get("script").toString(), Maps.newHashMap());
