@@ -6,6 +6,7 @@ The CouchDB River plugin allows to hook into couchdb `_changes` feed and automat
 In order to install the plugin, simply run: `bin/plugin -install elasticsearch/elasticsearch-river-couchdb/2.0.0`.
 
 * For master elasticsearch versions, look at [master branch](https://github.com/elasticsearch/elasticsearch-river-couchdb/tree/master).
+* For 1.4.x elasticsearch versions, look at [es-1.4 branch](https://github.com/elasticsearch/elasticsearch-river-couchdb/tree/es-1.4).
 * For 1.3.x elasticsearch versions, look at [es-1.3 branch](https://github.com/elasticsearch/elasticsearch-river-couchdb/tree/es-1.3).
 * For 1.2.x elasticsearch versions, look at [es-1.2 branch](https://github.com/elasticsearch/elasticsearch-river-couchdb/tree/es-1.2).
 * For 1.0.x elasticsearch versions, look at [es-1.0 branch](https://github.com/elasticsearch/elasticsearch-river-couchdb/tree/es-1.0).
