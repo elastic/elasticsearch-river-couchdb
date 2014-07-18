@@ -186,7 +186,6 @@ public class CouchdbRiverIntegrationTest extends ElasticsearchIntegrationTest {
                 .startObject()
                     .field("type", "couchdb")
                     .startObject("couchdb")
-                        .field("script_type", "mvel")
                         .field("script", "ctx.doc.newfield = ctx.doc.foo")
                     .endObject()
                 .endObject(), randomIntBetween(5, 1000), null);
