@@ -141,11 +141,6 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
 
             if (couchSettings.containsKey("script")) {
                 String scriptType = "mvel";
-                // TODO Remove scriptType support (deprecated)
-                if(couchSettings.containsKey("scriptType")) {
-                    logger.warn("scriptType has been deprecated. Please use script_type.");
-                    scriptType = couchSettings.get("scriptType").toString();
-                }
                 if(couchSettings.containsKey("script_type")) {
                     scriptType = couchSettings.get("script_type").toString();
                 }
