@@ -19,6 +19,7 @@
 
 package org.elasticsearch.river.couchdb;
 
+import org.elasticsearch.action.get.GetResponse;
 import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.common.Strings;
 import org.elasticsearch.common.base.Predicate;
@@ -430,5 +431,63 @@ public class CouchdbRiverIntegrationTest extends ElasticsearchIntegrationTest {
 
         // We expect seeing a line in logs like:
         // [WARN ][org.elasticsearch.river.couchdb] [node_0] [couchdb][elasticsearch_couch_test_test_closing_while_indexing_66] river was closing while trying to index document [elasticsearch_couch_test_test_closing_while_indexing_66/elasticsearch_couch_test_test_closing_while_indexing_66/11]. Operation skipped.
+    }
+
+    /**
+     * Test case for #17: https://github.com/elasticsearch/elasticsearch-river-couchdb/issues/17
+     */
+    @Test
+    public void testCreateCouchdbDatabaseWhileRunning_17() throws IOException, InterruptedException {
+        final int nbDocs = between(50, 300);
+        logger.info("  -> Checking couchdb running");
+        CouchDBClient.checkCouchDbRunning();
+
+        logger.info("  -> Create index");
+        try {
+            createIndex(getDbName());
+        } catch (IndexAlreadyExistsException e) {
+            // No worries. We already created the index before
+        }
+
+        logger.info("  -> Create river");
+        index("_river", getDbName(), "_meta", jsonBuilder()
+                .startObject()
+                    .field("type", "couchdb")
+                .endObject());
+
+        // Check that the river is started
+        assertThat(awaitBusy(new Predicate<Object>() {
+            public boolean apply(Object obj) {
+                try {
+                    refresh();
+                    GetResponse response = get("_river", getDbName(), "_status");
+                    return response.isExists();
+                } catch (IndexMissingException e) {
+                    return false;
+                }
+            }
+        }, 5, TimeUnit.SECONDS), equalTo(true));
+
+        logger.info("  -> Creating test database [{}]", getDbName());
+        CouchDBClient.dropAndCreateTestDatabase(getDbName());
+
+        logger.info("  -> Inserting [{}] docs in couchdb", nbDocs);
+        for (int i = 0; i < nbDocs; i++) {
+            CouchDBClient.putDocument(getDbName(), "" + i, "foo", "bar", "content", "" + i);
+        }
+
+        // Check that docs are still processed by the river
+        assertThat(awaitBusy(new Predicate<Object>() {
+            public boolean apply(Object obj) {
+                try {
+                    refresh();
+                    SearchResponse response = client().prepareSearch(getDbName()).get();
+                    logger.info("  -> got {} docs in {} index", response.getHits().totalHits(), getDbName());
+                    return response.getHits().totalHits() == nbDocs;
+                } catch (IndexMissingException e) {
+                    return false;
+                }
+            }
+        }, 1, TimeUnit.MINUTES), equalTo(true));
     }
 }
