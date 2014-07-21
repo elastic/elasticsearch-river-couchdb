@@ -286,7 +286,17 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
             return null;
         }
         Object seq = ctx.get("seq");
-        String id = ctx.get("id").toString();
+        Object oId = ctx.get("id");
+        if (oId == null) {
+            return null;
+        }
+
+        String id = oId.toString();
+
+        if (closed) {
+            logger.warn("river was closing while processing couchdb doc [{}]. Operation skipped.", id);
+            return null;
+        }
 
         // Ignore design documents
         if (id.startsWith("_design/")) {
@@ -294,11 +304,6 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
                 logger.trace("ignoring design document {}", id);
             }
             return seq;
-        }
-
-        if (closed) {
-            logger.warn("river was closing while processing couchdb doc [{}]. Operation skipped.", id);
-            return null;
         }
 
         if (script != null) {
@@ -312,8 +317,6 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
                 return seq;
             }
         }
-
-        id = (ctx.get("id") == null) ? null : ctx.get("id").toString();
 
         if (ctx.containsKey("ignore") && ctx.get("ignore").equals(Boolean.TRUE)) {
             // ignore dock
