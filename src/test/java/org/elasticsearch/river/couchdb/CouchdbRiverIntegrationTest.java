@@ -333,5 +333,103 @@ public class CouchdbRiverIntegrationTest extends ElasticsearchIntegrationTest {
         assertThat(response.getHits().getAt(0).field("_id"), nullValue());
     }
 
+    /**
+     * Test case for #66: https://github.com/elasticsearch/elasticsearch-river-couchdb/issues/66
+     */
+    @Test
+    public void testClosingWhileIndexing_66() throws IOException, InterruptedException {
+        final int nbDocs = 10;
+        logger.info("  -> Checking couchdb running");
+        CouchDBClient.checkCouchDbRunning();
+        logger.info("  -> Creating test database [{}]", getDbName());
+        CouchDBClient.dropAndCreateTestDatabase(getDbName());
 
+        logger.info("  -> Inserting [{}] docs in couchdb", nbDocs);
+        for (int i = 0; i < nbDocs; i++) {
+            CouchDBClient.putDocument(getDbName(), "" + i, "foo", "bar", "content", "" + i);
+        }
+
+        logger.info("  -> Create index");
+        try {
+            createIndex(getDbName());
+        } catch (IndexAlreadyExistsException e) {
+            // No worries. We already created the index before
+        }
+
+        logger.info("  -> Create river");
+        index("_river", getDbName(), "_meta", jsonBuilder()
+                .startObject()
+                    .field("type", "couchdb")
+                    .startObject("couchdb")
+                // We use here a script to have a chance to slow down the process and close the river while processing it
+                        .field("script", "for (int x = 0; x < 10000000; x++) { x*x*x } ;")
+                    .endObject()
+                    .startObject("index")
+                        .field("flush_interval", "100ms")
+                    .endObject()
+                .endObject());
+
+        // Check that docs are indexed by the river
+        assertThat(awaitBusy(new Predicate<Object>() {
+            public boolean apply(Object obj) {
+                try {
+                    refresh();
+                    SearchResponse response = client().prepareSearch(getDbName()).get();
+                    logger.info("  -> got {} docs in {} index", response.getHits().totalHits(), getDbName());
+                    return response.getHits().totalHits() == nbDocs;
+                } catch (IndexMissingException e) {
+                    return false;
+                }
+            }
+        }, 1, TimeUnit.MINUTES), equalTo(true));
+
+
+        logger.info("  -> Inserting [{}] docs in couchdb", nbDocs);
+        for (int i = nbDocs; i < 2*nbDocs; i++) {
+            CouchDBClient.putDocument(getDbName(), "" + i, "foo", "bar", "content", "" + i);
+        }
+
+        // Check that docs are still processed by the river
+        assertThat(awaitBusy(new Predicate<Object>() {
+            public boolean apply(Object obj) {
+                try {
+                    refresh();
+                    SearchResponse response = client().prepareSearch(getDbName()).get();
+                    logger.info("  -> got {} docs in {} index", response.getHits().totalHits(), getDbName());
+                    return response.getHits().totalHits() > nbDocs;
+                } catch (IndexMissingException e) {
+                    return false;
+                }
+            }
+        }, 10, TimeUnit.SECONDS), equalTo(true));
+
+        logger.info("  -> Remove river while injecting");
+        client().admin().indices().prepareDeleteMapping("_river").setType(getDbName()).get();
+
+        logger.info("  -> Inserting [{}] docs in couchdb", nbDocs);
+        for (int i = 2*nbDocs; i < 3*nbDocs; i++) {
+            CouchDBClient.putDocument(getDbName(), "" + i, "foo", "bar", "content", "" + i);
+        }
+
+        // Check that docs are indexed by the river
+        boolean foundAllDocs = awaitBusy(new Predicate<Object>() {
+            public boolean apply(Object obj) {
+                try {
+                    refresh();
+                    SearchResponse response = client().prepareSearch(getDbName()).get();
+                    logger.info("  -> got {} docs in {} index", response.getHits().totalHits(), getDbName());
+                    return response.getHits().totalHits() == 3 * nbDocs;
+                } catch (IndexMissingException e) {
+                    return false;
+                }
+            }
+        }, 10, TimeUnit.SECONDS);
+
+        // We should not have 20 documents at the end as we removed the river immediately after having
+        // injecting 10 more docs in couchdb
+        assertThat("We should not have 20 documents as the river is supposed to have been stopped!", foundAllDocs, is(false));
+
+        // We expect seeing a line in logs like:
+        // [WARN ][org.elasticsearch.river.couchdb] [node_0] [couchdb][elasticsearch_couch_test_test_closing_while_indexing_66] river was closing while trying to index document [elasticsearch_couch_test_test_closing_while_indexing_66/elasticsearch_couch_test_test_closing_while_indexing_66/11]. Operation skipped.
+    }
 }
