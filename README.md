@@ -1,28 +1,19 @@
 CouchDB River Plugin for Elasticsearch
 ==================================
 
-The CouchDB River plugin allows to hook into couchdb `_changes` feed and automatically index it into elasticsearch.
+The CouchDB River plugin allows to automatically index couchdb and make it searchable using the excellent 
+[_changes](http://guide.couchdb.org/draft/notifications.html) stream couchdb provides.
 
-In order to install the plugin, simply run: `bin/plugin -install elasticsearch/elasticsearch-river-couchdb/2.0.0`.
+## Version 2.3.0-SNAPSHOT for Elasticsearch: 1.3
 
-* For master elasticsearch versions, look at [master branch](https://github.com/elasticsearch/elasticsearch-river-couchdb/tree/master).
-* For 1.3.x elasticsearch versions, look at [es-1.3 branch](https://github.com/elasticsearch/elasticsearch-river-couchdb/tree/es-1.3).
-* For 1.2.x elasticsearch versions, look at [es-1.2 branch](https://github.com/elasticsearch/elasticsearch-river-couchdb/tree/es-1.2).
-* For 1.0.x elasticsearch versions, look at [es-1.0 branch](https://github.com/elasticsearch/elasticsearch-river-couchdb/tree/es-1.0).
-* For 0.90.x elasticsearch versions, look at [es-0.90 branch](https://github.com/elasticsearch/elasticsearch-river-couchdb/tree/es-0.90).
+If you are looking for another version documentation, please refer to the 
+[compatibility matrix](https://github.com/elasticsearch/elasticsearch-river-couchdb/#couchdb-river-plugin-for-elasticsearch).
 
 
-|       CouchDB Plugin        |    elasticsearch    | Release date |
-|-----------------------------|---------------------|:------------:|
-| 2.3.0-SNAPSHOT              | 1.3.0 -> 1.3        |  XXXX-XX-XX  |
+Create river
+------------
 
-Please read documentation relative to the version you are using:
-
-* [2.3.0-SNAPSHOT](https://github.com/elasticsearch/elasticsearch-river-couchdb/blob/es-1.3/README.md)
-
-
-
-The CouchDB River allows to automatically index couchdb and make it searchable using the excellent [_changes](http://guide.couchdb.org/draft/notifications.html) stream couchdb provides. Setting it up is as simple as executing the following against elasticsearch:
+ Setting it up is as simple as executing the following against elasticsearch:
 
 ```sh
 curl -XPUT 'localhost:9200/_river/my_db/_meta' -d '{
