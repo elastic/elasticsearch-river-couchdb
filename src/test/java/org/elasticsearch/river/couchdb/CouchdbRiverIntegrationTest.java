@@ -490,4 +490,26 @@ public class CouchdbRiverIntegrationTest extends ElasticsearchIntegrationTest {
             }
         }, 1, TimeUnit.MINUTES), equalTo(true));
     }
+
+    /**
+     * Test case for #71: https://github.com/elasticsearch/elasticsearch-river-couchdb/issues/71
+     */
+    @Test
+    public void testDropCouchdbDatabaseWhileRunning_71() throws IOException, InterruptedException {
+        final int nbDocs = between(50, 300);
+        launchTest(jsonBuilder()
+                .startObject()
+                    .field("type", "couchdb")
+                .endObject(), nbDocs, null);
+
+        logger.info("  -> Removing test database [{}]", getDbName());
+        CouchDBClient.dropTestDatabase(getDbName());
+
+        // We wait for 10 seconds
+        awaitBusy(new Predicate<Object>() {
+            public boolean apply(Object obj) {
+                return false;
+            }
+        }, 10, TimeUnit.SECONDS);
+    }
 }
