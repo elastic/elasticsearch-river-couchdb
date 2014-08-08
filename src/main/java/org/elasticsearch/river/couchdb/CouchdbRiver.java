@@ -140,7 +140,7 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
             }
 
             if (couchSettings.containsKey("script")) {
-                String scriptType = "groovy";
+                String scriptType = "mvel";
                 if(couchSettings.containsKey("script_type")) {
                     scriptType = couchSettings.get("script_type").toString();
                 }

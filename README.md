@@ -88,7 +88,7 @@ change (for example, **ctx.doc** will refer to the document, or **ctx.deleted** 
 Any other [script language supported by Elasticsearch](http://www.elasticsearch.org/guide/en/elasticsearch/reference/current/modules-plugins.html#scripting) 
 may be used by setting the `script_type` parameter to the appropriate value. 
 
-If unspecified, the default is `groovy`. 
+If unspecified, the default is `mvel`. 
 See [Scripting documentation](http://www.elasticsearch.org/guide/en/elasticsearch/reference/current/modules-scripting.html) for details. 
 
 The **ctx.doc** can be changed and its value can will be indexed (assuming its not a deleted change). 
