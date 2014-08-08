@@ -42,7 +42,7 @@ public class CouchDBClient {
         Assert.assertThat("Couchdb is not running on [" + host + "][" + port + "]", response.errorCode(), is(200));
     }
 
-    public static void dropAndCreateTestDatabase(final String dbName) throws InterruptedException {
+    public static void dropTestDatabase(final String dbName) throws InterruptedException {
         // Remove the database
         httpClient.request("DELETE", "/" + dbName);
 
@@ -53,11 +53,18 @@ public class CouchDBClient {
                 return response.errorCode() == 404;
             }
         }, 30, TimeUnit.SECONDS);
+    }
 
+    public static void createTestDatabase(final String dbName) throws InterruptedException {
         // Create the database
         HttpClientResponse response = httpClient.request("PUT", "/" + dbName);
 
         Assert.assertThat("can not create database " + dbName, response.errorCode(), is(201));
+    }
+
+    public static void dropAndCreateTestDatabase(final String dbName) throws InterruptedException {
+        dropTestDatabase(dbName);
+        createTestDatabase(dbName);
     }
 
     public static void putDocument(String dbName, String id, String json) {
