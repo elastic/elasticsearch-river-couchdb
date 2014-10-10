@@ -19,7 +19,6 @@
 
 package org.elasticsearch.river.couchdb;
 
-import org.apache.lucene.util.LuceneTestCase;
 import org.elasticsearch.action.get.GetResponse;
 import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.common.Strings;
@@ -33,6 +32,8 @@ import org.elasticsearch.indices.IndexAlreadyExistsException;
 import org.elasticsearch.indices.IndexMissingException;
 import org.elasticsearch.plugins.PluginsService;
 import org.elasticsearch.river.couchdb.helper.CouchDBClient;
+import org.elasticsearch.script.groovy.GroovyScriptEngineService;
+import org.elasticsearch.search.SearchHit;
 import org.elasticsearch.test.ElasticsearchIntegrationTest;
 import org.junit.Test;
 
@@ -60,7 +61,8 @@ public class CouchdbRiverIntegrationTest extends ElasticsearchIntegrationTest {
         return ImmutableSettings.builder()
                 .put(super.nodeSettings(nodeOrdinal))
                 .put("plugins." + PluginsService.LOAD_PLUGIN_FROM_CLASSPATH, true)
-                .build();
+                .put(GroovyScriptEngineService.GROOVY_SCRIPT_SANDBOX_ENABLED, false)
+            .build();
     }
 
     private interface InjectorHook {
@@ -83,6 +85,7 @@ public class CouchdbRiverIntegrationTest extends ElasticsearchIntegrationTest {
         for (int i = 0; i < numDocs; i++) {
             CouchDBClient.putDocument(getDbName(), "" + i, "foo", "bar", "content", "" + i);
         }
+        logger.info("  -> Put [{}] documents done", numDocs);
 
         if (injectorHook != null) {
             logger.info("  -> Injecting extra data");
@@ -313,25 +316,52 @@ public class CouchdbRiverIntegrationTest extends ElasticsearchIntegrationTest {
     /**
      * Test case for #45: https://github.com/elasticsearch/elasticsearch-river-couchdb/issues/45
      */
-    @Test @LuceneTestCase.AwaitsFix(bugUrl = "https://github.com/elasticsearch/elasticsearch-river-couchdb/issues/65")
+    @Test
     public void testScriptingTypeOf_45() throws IOException, InterruptedException {
         launchTest(jsonBuilder()
                 .startObject()
                     .field("type", "couchdb")
                     .startObject("couchdb")
-                        .field("script_type", "mvel")
-                        .field("script", "var oblitertron = function(x) { var things = [\"foo\"]; var toberemoved = new java.util.ArrayList(); foreach (i : x.keySet()) { if(things.indexOf(i) == -1) { toberemoved.add(i); } } foreach (i : toberemoved) { x.remove(i); } return x; }; ctx.doc = oblitertron(ctx.doc);")
+                        .field("script_type", "groovy")
+                        // This groovy script removes all "_id" fields and 50% of "content" fields
+                        .field("script", " def docId = Integer.parseInt(ctx.doc[\"_id\"]);\n" +
+                                " def removals = [\"content\", \"_id\"]; \n" +
+                                " for(i in removals) { \n" +
+                                "\tif (ctx.doc.containsKey(i)) { \n" +
+                                "\t\tif (\"content\".equals(i)) {\n" +
+                                "\t\t\tif ((docId % 2) == 0) {\n" +
+                                "\t\t\t\tctx.doc.remove(i)\n" +
+                                "\t\t\t} \n" +
+                                "\t\t} else {\n" +
+                                "\t\t\tctx.doc.remove(i)\n" +
+                                "\t\t}\n" +
+                                "\t} \n" +
+                                "}")
                     .endObject()
                 .endObject(), randomIntBetween(5, 1000), null);
 
+        int nbOfResultsToCheck = 100;
+
         SearchResponse response = client().prepareSearch(getDbName())
                 .addField("foo")
+                .addField("content")
                 .addField("_id")
+                .setSize(nbOfResultsToCheck)
                 .get();
 
-        assertThat(response.getHits().getAt(0).field("foo"), notNullValue());
-        assertThat(response.getHits().getAt(0).field("foo").getValue().toString(), is("bar"));
-        assertThat(response.getHits().getAt(0).field("_id"), nullValue());
+        for (int i=0; i < Math.min(response.getHits().getTotalHits(), nbOfResultsToCheck); i++) {
+            SearchHit hit = response.getHits().getAt(i);
+            int docId = Integer.parseInt(hit.getId());
+
+            assertThat(hit.field("foo"), notNullValue());
+            assertThat(hit.field("foo").getValue().toString(), is("bar"));
+            assertThat(hit.field("_id"), nullValue());
+            if ((docId % 2) == 0) {
+                assertThat(hit.field("content"), nullValue());
+            } else {
+                assertThat(hit.field("content").getValue().toString(), is(hit.getId()));
+            }
+        }
     }
 
     /**
