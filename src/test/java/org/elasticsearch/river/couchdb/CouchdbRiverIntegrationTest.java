@@ -35,6 +35,7 @@ import org.elasticsearch.river.couchdb.helper.CouchDBClient;
 import org.elasticsearch.script.groovy.GroovyScriptEngineService;
 import org.elasticsearch.search.SearchHit;
 import org.elasticsearch.test.ElasticsearchIntegrationTest;
+import org.junit.Before;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -71,8 +72,15 @@ public class CouchdbRiverIntegrationTest extends ElasticsearchIntegrationTest {
 
     private static final String testDbPrefix = "elasticsearch_couch_test_";
 
+    private String suffix;
+
+    @Before
+    public final void wipeBefore() {
+        suffix = String.valueOf(System.nanoTime()) + "_" + randomInt();
+    }
+
     private String getDbName() {
-        return testDbPrefix.concat(Strings.toUnderscoreCase(getTestName()));
+        return testDbPrefix.concat(Strings.toUnderscoreCase(getTestName())).concat(suffix);
     }
 
     private void launchTest(XContentBuilder river, final Integer numDocs, InjectorHook injectorHook)
