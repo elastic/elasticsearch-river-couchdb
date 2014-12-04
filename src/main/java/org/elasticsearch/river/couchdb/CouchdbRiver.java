@@ -258,8 +258,12 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
             return;
         }
         logger.info("closing couchdb stream river");
-        slurperThread.interrupt();
-        indexerThread.interrupt();
+        if (slurperThread != null) {
+            slurperThread.interrupt();
+        }
+        if (indexerThread != null) {
+            indexerThread.interrupt();
+        }
 
         closed = true;
 
