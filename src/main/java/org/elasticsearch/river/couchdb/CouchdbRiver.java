@@ -20,7 +20,6 @@
 package org.elasticsearch.river.couchdb;
 
 import org.apache.lucene.util.IOUtils;
-import org.elasticsearch.ExceptionsHelper;
 import org.elasticsearch.action.bulk.BulkItemResponse;
 import org.elasticsearch.action.bulk.BulkProcessor;
 import org.elasticsearch.action.bulk.BulkRequest;
@@ -29,7 +28,6 @@ import org.elasticsearch.action.delete.DeleteRequest;
 import org.elasticsearch.action.get.GetResponse;
 import org.elasticsearch.action.index.IndexRequest;
 import org.elasticsearch.client.Client;
-import org.elasticsearch.cluster.block.ClusterBlockException;
 import org.elasticsearch.common.Base64;
 import org.elasticsearch.common.collect.Maps;
 import org.elasticsearch.common.inject.Inject;
@@ -39,7 +37,6 @@ import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.common.xcontent.XContentFactory;
 import org.elasticsearch.common.xcontent.XContentType;
 import org.elasticsearch.common.xcontent.support.XContentMapValues;
-import org.elasticsearch.indices.IndexAlreadyExistsException;
 import org.elasticsearch.river.*;
 import org.elasticsearch.script.ExecutableScript;
 import org.elasticsearch.script.ScriptService;
@@ -198,19 +195,6 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
     @Override
     public void start() {
         logger.info("starting couchdb stream: host [{}], port [{}], filter [{}], db [{}], indexing to [{}]/[{}]", couchHost, couchPort, couchFilter, couchDb, indexName, typeName);
-        try {
-            client.admin().indices().prepareCreate(indexName).execute().actionGet();
-        } catch (Exception e) {
-            if (ExceptionsHelper.unwrapCause(e) instanceof IndexAlreadyExistsException) {
-                // that's fine
-            } else if (ExceptionsHelper.unwrapCause(e) instanceof ClusterBlockException) {
-                // ok, not recovered yet..., lets start indexing and hope we recover by the first bulk
-                // TODO: a smarter logic can be to register for cluster event listener here, and only start sampling when the block is removed...
-            } else {
-                logger.warn("failed to create index [{}], disabling river...", e, indexName);
-                return;
-            }
-        }
 
         // Creating bulk processor
         this.bulkProcessor = BulkProcessor.builder(client, new BulkProcessor.Listener() {
