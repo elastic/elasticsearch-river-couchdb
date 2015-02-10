@@ -394,6 +394,17 @@ ctx.doc = oblitertron(ctx.doc);
 ```
 
 
+Tests
+=====
+
+To run couchdb integration tests, you need to have couchdb running on `localhost` using default `5984` port.
+Then you can run tests using `tests.couchdb` option:
+
+```sh
+mvn clean test -Dtests.couchdb=true
+```
+
+
 License
 =======
 
