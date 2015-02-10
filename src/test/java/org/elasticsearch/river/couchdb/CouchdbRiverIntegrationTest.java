@@ -35,6 +35,7 @@ import org.elasticsearch.river.couchdb.helper.CouchDBClient;
 import org.elasticsearch.script.groovy.GroovyScriptEngineService;
 import org.elasticsearch.search.SearchHit;
 import org.elasticsearch.test.ElasticsearchIntegrationTest;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -75,8 +76,18 @@ public class CouchdbRiverIntegrationTest extends ElasticsearchIntegrationTest {
     private String suffix;
 
     @Before
-    public final void wipeBefore() {
+    public final void dbSuffixName() {
         suffix = String.valueOf(System.nanoTime()) + "_" + randomInt();
+    }
+
+    @After
+    public final void wipeDbAfterTest() {
+        logger.info("  -> Removing test database [{}]", getDbName());
+        try {
+            CouchDBClient.dropTestDatabase(getDbName());
+        } catch (Exception e) {
+            // Let's ignore it
+        }
     }
 
     private String getDbName() {
