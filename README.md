@@ -7,7 +7,7 @@ The CouchDB River plugin allows to automatically index couchdb and make it searc
 In order to install the plugin, run: 
 
 ```sh
-bin/plugin -install elasticsearch/elasticsearch-river-couchdb/2.4.1
+bin/plugin install elasticsearch/elasticsearch-river-couchdb/2.4.2
 ```
 
 You need to install a version matching your Elasticsearch version:
@@ -16,7 +16,7 @@ You need to install a version matching your Elasticsearch version:
 |------------------------|--------------------|------------------------------------------------------------------------------------------------------------------------------------|
 |    master              | Build from source  | See below                                                                                                                          |
 |    es-1.x              | Build from source  | [2.5.0-SNAPSHOT](https://github.com/elasticsearch/elasticsearch-river-couchdb/tree/es-1.x/#version-250-snapshot-for-elasticsearch-1x)|
-|    es-1.4              |     2.4.1         | [2.4.1](https://github.com/elasticsearch/elasticsearch-river-couchdb/tree/v2.4.1/#version-241-for-elasticsearch-14)                  |
+|    es-1.4              |     2.4.2         | [2.4.2](https://github.com/elasticsearch/elasticsearch-river-couchdb/tree/v2.4.2/#version-242-for-elasticsearch-14)                  |
 |    es-1.3              |     2.3.0         | [2.3.0](https://github.com/elasticsearch/elasticsearch-river-couchdb/tree/v2.3.0/#version-230-for-elasticsearch-13)                  |
 |    es-1.2              |     2.2.0          | [2.2.0](https://github.com/elasticsearch/elasticsearch-river-couchdb/tree/v2.2.0/#couchdb-river-plugin-for-elasticsearch)          |
 |    es-1.0              |     2.0.0          | [2.0.0](https://github.com/elasticsearch/elasticsearch-river-couchdb/tree/v2.0.0/#couchdb-river-plugin-for-elasticsearch)          |
