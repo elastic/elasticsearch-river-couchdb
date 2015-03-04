@@ -241,6 +241,28 @@ public class CouchdbRiverIntegrationTest extends ElasticsearchIntegrationTest {
         assertThat(response.getHits().getAt(0).field("newfield").getValue().toString(), is("bar"));
     }
 
+    @Test
+    public void testScriptingIdOverwrite() throws IOException, InterruptedException {
+        launchTest(jsonBuilder()
+                .startObject()
+                .field("type", "couchdb")
+                .startObject("couchdb")
+                .field("script", "ctx.doc._id_old = ctx.doc._id; ctx.doc._id = ctx.doc._id + '_' + ctx.doc._rev;")
+                .endObject()
+                .endObject(), 1, null);
+
+        SearchResponse response = client().prepareSearch(getDbName())
+                .addField("_id")
+                .addField("_id_old")
+                .addField("_rev")
+                .get();
+
+        String composedId = response.getHits().getAt(0).field("_id_old").getValue().toString()
+                + "_"
+                +  response.getHits().getAt(0).field("_rev").getValue().toString();
+        assertThat(response.getHits().getAt(0).field("_id").getValue().toString(), is(composedId));
+    }
+
     /**
      * Test case for #44: https://github.com/elasticsearch/elasticsearch-river-couchdb/issues/44
      */

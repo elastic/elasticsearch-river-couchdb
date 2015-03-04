@@ -301,6 +301,16 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
                 return seq;
             }
         }
+        
+        //update doc id if it was overwritten
+        if (ctx.containsKey("doc")) {
+            oId = ((Map<String, Object>) ctx.get("doc")).get("_id");
+            if (oId != null && !id.equals(oId.toString())) {
+                id = oId.toString();
+                ctx.put("id", id);
+            }
+        }
+
 
         if (ctx.containsKey("ignore") && ctx.get("ignore").equals(Boolean.TRUE)) {
             // ignore dock
