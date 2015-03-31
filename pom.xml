@@ -10,7 +10,7 @@
     <packaging>jar</packaging>
     <name>Elasticsearch CouchDB River plugin</name>
     <description>The CouchDB River plugin allows to hook into couchdb _changes feed and automatically index it into elasticsearch.</description>
-    <url>https://github.com/elasticsearch/elasticsearch-river-couchdb/</url>
+    <url>https://github.com/elastic/elasticsearch-river-couchdb/</url>
     <inceptionYear>2009</inceptionYear>
     <licenses>
         <license>
@@ -20,9 +20,9 @@
         </license>
     </licenses>
     <scm>
-        <connection>scm:git:git@github.com:elasticsearch/elasticsearch-river-couchdb.git</connection>
-        <developerConnection>scm:git:git@github.com:elasticsearch/elasticsearch-river-couchdb.git</developerConnection>
-        <url>http://github.com/elasticsearch/elasticsearch-river-couchdb</url>
+        <connection>scm:git:git@github.com:elastic/elasticsearch-river-couchdb.git</connection>
+        <developerConnection>scm:git:git@github.com:elastic/elasticsearch-river-couchdb.git</developerConnection>
+        <url>http://github.com/elastic/elasticsearch-river-couchdb</url>
     </scm>
 
     <parent>
