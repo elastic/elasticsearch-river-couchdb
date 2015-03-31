@@ -454,7 +454,7 @@ public class CouchdbRiverIntegrationTest extends ElasticsearchIntegrationTest {
         }, 10, TimeUnit.SECONDS), equalTo(true));
 
         logger.info("  -> Remove river while injecting");
-        client().admin().indices().prepareDeleteMapping("_river").setType(getDbName()).get();
+        client().prepareDelete("_river", getDbName(), "_meta").get();
 
         logger.info("  -> Inserting [{}] docs in couchdb", nbDocs);
         for (int i = 2*nbDocs; i < 3*nbDocs; i++) {
