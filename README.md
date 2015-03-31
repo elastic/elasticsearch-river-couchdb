@@ -4,7 +4,7 @@ CouchDB River Plugin for Elasticsearch
 The CouchDB River plugin allows to automatically index couchdb and make it searchable using the excellent 
 [_changes](http://guide.couchdb.org/draft/notifications.html) stream couchdb provides.
 
-In order to install the plugin, run: 
+In order to install the plugin, run the following from your elasticsearch directory: 
 
 ```sh
 bin/plugin install elasticsearch/elasticsearch-river-couchdb/2.4.2
