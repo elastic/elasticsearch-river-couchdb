@@ -39,6 +39,7 @@ import org.elasticsearch.common.xcontent.XContentType;
 import org.elasticsearch.common.xcontent.support.XContentMapValues;
 import org.elasticsearch.river.*;
 import org.elasticsearch.script.ExecutableScript;
+import org.elasticsearch.script.ScriptContext;
 import org.elasticsearch.script.ScriptService;
 
 import javax.net.ssl.HostnameVerifier;
@@ -143,7 +144,7 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
                 }
 
                 script = scriptService.executable(scriptType, couchSettings.get("script").toString(),
-                        ScriptService.ScriptType.INLINE, Maps.<String, Object>newHashMap());
+                        ScriptService.ScriptType.INLINE, ScriptContext.UPDATE, Maps.<String, Object>newHashMap());
             } else {
                 script = null;
             }
