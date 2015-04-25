@@ -475,9 +475,9 @@ public class CouchdbRiverIntegrationTest extends ElasticsearchIntegrationTest {
             }
         }, 10, TimeUnit.SECONDS);
 
-        // We should not have 20 documents at the end as we removed the river immediately after having
+        // We should not have 30 documents at the end as we removed the river immediately after having
         // injecting 10 more docs in couchdb
-        assertThat("We should not have 20 documents as the river is supposed to have been stopped!", foundAllDocs, is(false));
+        assertThat("We should not have 30 documents as the river is supposed to have been stopped!", foundAllDocs, is(false));
 
         // We expect seeing a line in logs like:
         // [WARN ][org.elasticsearch.river.couchdb] [node_0] [couchdb][elasticsearch_couch_test_test_closing_while_indexing_66] river was closing while trying to index document [elasticsearch_couch_test_test_closing_while_indexing_66/elasticsearch_couch_test_test_closing_while_indexing_66/11]. Operation skipped.
