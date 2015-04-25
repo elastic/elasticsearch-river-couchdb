@@ -144,7 +144,7 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
                 }
 
                 script = scriptService.executable(scriptType, couchSettings.get("script").toString(),
-                        ScriptService.ScriptType.INLINE, ScriptContext.UPDATE, Maps.<String, Object>newHashMap());
+                        ScriptService.ScriptType.INLINE, ScriptContext.Standard.UPDATE, Maps.<String, Object>newHashMap());
             } else {
                 script = null;
             }
