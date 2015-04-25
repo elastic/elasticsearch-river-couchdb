@@ -39,6 +39,7 @@ import org.elasticsearch.common.xcontent.XContentType;
 import org.elasticsearch.common.xcontent.support.XContentMapValues;
 import org.elasticsearch.river.*;
 import org.elasticsearch.script.ExecutableScript;
+import org.elasticsearch.script.Script;
 import org.elasticsearch.script.ScriptContext;
 import org.elasticsearch.script.ScriptService;
 
@@ -143,8 +144,9 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
                     scriptType = couchSettings.get("script_type").toString();
                 }
 
-                script = scriptService.executable(scriptType, couchSettings.get("script").toString(),
-                        ScriptService.ScriptType.INLINE, ScriptContext.Standard.UPDATE, Maps.<String, Object>newHashMap());
+                script = scriptService.executable(
+                        new Script(scriptType, couchSettings.get("script").toString(), ScriptService.ScriptType.INLINE, Maps.<String, Object>newHashMap()),
+                        ScriptContext.Standard.UPDATE);
             } else {
                 script = null;
             }
