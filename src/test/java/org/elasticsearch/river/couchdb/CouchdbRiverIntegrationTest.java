@@ -32,7 +32,6 @@ import org.elasticsearch.indices.IndexAlreadyExistsException;
 import org.elasticsearch.indices.IndexMissingException;
 import org.elasticsearch.plugins.PluginsService;
 import org.elasticsearch.river.couchdb.helper.CouchDBClient;
-import org.elasticsearch.script.groovy.GroovyScriptEngineService;
 import org.elasticsearch.search.SearchHit;
 import org.elasticsearch.test.ElasticsearchIntegrationTest;
 import org.junit.After;
@@ -63,7 +62,6 @@ public class CouchdbRiverIntegrationTest extends ElasticsearchIntegrationTest {
         return ImmutableSettings.builder()
                 .put(super.nodeSettings(nodeOrdinal))
                 .put("plugins." + PluginsService.LOAD_PLUGIN_FROM_CLASSPATH, true)
-                .put(GroovyScriptEngineService.GROOVY_SCRIPT_SANDBOX_ENABLED, false)
             .build();
     }
 
