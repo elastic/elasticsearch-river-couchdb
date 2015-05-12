@@ -33,6 +33,7 @@
 
     <properties>
         <tests.couchdb>false</tests.couchdb>
+        <tests.security.manager>true</tests.security.manager>
     </properties>
 
     <dependencies>
