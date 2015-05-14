@@ -19,28 +19,16 @@
 
 package org.elasticsearch.river.couchdb;
 
-import com.carrotsearch.randomizedtesting.annotations.TestGroup;
+import org.elasticsearch.test.ElasticsearchIntegrationTest;
+import org.elasticsearch.test.ElasticsearchIntegrationTest.ThirdParty;
 
-import java.lang.annotation.Documented;
-import java.lang.annotation.Inherited;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
+/**
+ * Base class for tests that require CouchDB to run. CouchDB tests are disabled by default.
+ * <p/>
+ * To enable test add -Dtests.thirdparty=true
+ * <p/>
+ */
+@ThirdParty
+public abstract class AbstractCouchdbTest extends ElasticsearchIntegrationTest {
 
-public class AbstractCouchdbTest {
-    /**
-     * Annotation for tests that require CouchDB to run. CouchDB tests are disabled by default.
-     * <p/>
-     * To enable test add -Dtests.couchdb=true
-     * <p/>
-     */
-    @Documented
-    @Inherited
-    @Retention(RetentionPolicy.RUNTIME)
-    @TestGroup(enabled = false, sysProperty = SYSPROP_COUCHDB)
-    public @interface CouchdbTest {
-    }
-
-    /**
-     */
-    public static final String SYSPROP_COUCHDB = "tests.couchdb";
 }

@@ -54,8 +54,7 @@ import static org.hamcrest.Matchers.*;
 @ElasticsearchIntegrationTest.ClusterScope(
         scope = ElasticsearchIntegrationTest.Scope.SUITE,
         numDataNodes = 0, numClientNodes = 0, transportClientRatio = 0.0)
-@AbstractCouchdbTest.CouchdbTest
-public class CouchdbRiverIntegrationTest extends ElasticsearchIntegrationTest {
+public class CouchdbRiverIntegrationTest extends AbstractCouchdbTest {
 
     @Override
     protected Settings nodeSettings(int nodeOrdinal) {
