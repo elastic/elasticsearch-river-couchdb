@@ -25,6 +25,7 @@ import org.elasticsearch.test.ElasticsearchTestCase;
 import org.junit.Assert;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -98,7 +99,7 @@ public class CouchDBClient {
 
         for (int i = 0; i < attachments.length; i++) {
             String filename = attachments[i];
-            byte[] content = attachments[++i].getBytes();
+            byte[] content = attachments[++i].getBytes(StandardCharsets.UTF_8);
 
             xContentBuilder.startObject(filename)
                         .field("content_type", "text/plain")

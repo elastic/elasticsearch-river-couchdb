@@ -50,6 +50,7 @@ import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -133,7 +134,7 @@ public class CouchdbRiver extends AbstractRiverComponent implements River {
             if (couchSettings.containsKey("user") && couchSettings.containsKey("password")) {
                 String user = couchSettings.get("user").toString();
                 String password = couchSettings.get("password").toString();
-                basicAuth = "Basic " + Base64.encodeBytes((user + ":" + password).getBytes());
+                basicAuth = "Basic " + Base64.encodeBytes((user + ":" + password).getBytes(StandardCharsets.UTF_8));
             } else {
                 basicAuth = null;
             }
