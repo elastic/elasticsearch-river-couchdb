@@ -4,7 +4,7 @@ CouchDB River Plugin for Elasticsearch
 The CouchDB River plugin allows to automatically index couchdb and make it searchable using the excellent 
 [_changes](http://guide.couchdb.org/draft/notifications.html) stream couchdb provides.
 
-## Version 2.6.0 for Elasticsearch: 1.6
+## Version 2.6.1-SNAPSHOT for Elasticsearch: 1.6
 
 If you are looking for another version documentation, please refer to the 
 [compatibility matrix](https://github.com/elasticsearch/elasticsearch-river-couchdb/#couchdb-river-plugin-for-elasticsearch).
